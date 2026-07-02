@@ -9,10 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 
 from ..auth import get_current_user_id
+from ..config import get_settings
 from ..db import engine
-from ..schemas import Book, BookCreate, BookUpdate
+from ..schemas import Book, BookCreate, BookUpdate, LibraryQueryRequest, LibraryQueryResponse
+from ..services import library_query
 
 router = APIRouter(prefix="/library", tags=["library"])
+settings = get_settings()
 
 
 @router.get("", response_model=list[Book])
@@ -28,6 +31,21 @@ def list_books(user_id: str = Depends(get_current_user_id)):
             {"me": user_id},
         ).mappings().all()
     return [Book(**r) for r in rows]
+
+
+@router.post("/query", response_model=LibraryQueryResponse)
+def query_library(
+    payload: LibraryQueryRequest, user_id: str = Depends(get_current_user_id)
+):
+    """Answer a natural-language question over ONLY the current user's library.
+
+    Text-to-SQL is scoped to this user via the my_library view + RLS-scoped
+    connection (see services/library_query.py). No other user's data is reachable.
+    """
+    result = library_query.answer_query(
+        payload.query, user_id, settings.openai_api_key
+    )
+    return LibraryQueryResponse(answer=result["answer"], sql=result["sql"])
 
 
 @router.post("", response_model=Book, status_code=status.HTTP_201_CREATED)
