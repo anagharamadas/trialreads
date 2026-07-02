@@ -58,11 +58,28 @@ create policy "library_delete_own"
     to authenticated
     using ( (select auth.uid()) = user_id );
 
+-- ── 4. Per-user self-filtering view (text-to-SQL isolation) ───────────────
+-- The /library/query endpoint points the LLM at THIS view, never at `library`.
+-- It hides user_id entirely and filters to the current user via auth.uid().
+-- security_invoker = on  →  the underlying table is read AS the querying role,
+-- so RLS on `library` is ALSO enforced (defense in depth), not bypassed by the
+-- view owner. Requires Postgres 15+ (Supabase is).
+create or replace view public.my_library
+    with (security_invoker = on) as
+    select id, book, author, status, year
+    from public.library
+    where user_id = (select auth.uid());
+
+grant select on public.my_library to authenticated;
+
 -- ════════════════════════════════════════════════════════════════════════
--- NOTE: the backend will connect with the SERVICE-ROLE key, which BYPASSES
--- RLS. That means RLS alone does NOT protect the multi-user text-to-SQL
--- feature — the backend must itself force a WHERE user_id = <current_user>
--- filter (Milestone 2, the highest-risk step). RLS is the safety net for any
--- path that uses the anon/authenticated role (e.g. the frontend's direct
--- Supabase client calls), not a substitute for backend-side scoping.
+-- ISOLATION MODEL (Milestone 2, highest-risk step):
+--   /library/query runs the LLM-generated SQL on a connection that does
+--   SET ROLE authenticated + stamps request.jwt.claims.sub = <user_id>, and
+--   only exposes `my_library`. So three things must ALL hold for a leak:
+--     (1) the view's WHERE user_id = auth.uid() filter,
+--     (2) RLS on the base table (enforced via security_invoker),
+--     (3) the engine only being given `my_library`.
+--   CRUD endpoints don't use the LLM: user_id comes from the verified JWT and
+--   every query is explicitly scoped WHERE user_id = :me.
 -- ════════════════════════════════════════════════════════════════════════
