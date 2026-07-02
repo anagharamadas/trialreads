@@ -1,25 +1,32 @@
 """JWT authentication — verifies the Supabase access token and yields user_id.
 
 The frontend sends Supabase's access token as `Authorization: Bearer <jwt>`.
-This dependency verifies the signature + claims and returns the `sub` (the
-Supabase auth user id).
 
-Verification method: HS256 against SUPABASE_JWT_SECRET (the classic Supabase
-approach). Structured so it can be swapped to asymmetric/JWKS verification if the
-project uses the new signing keys — we confirm against a real token in M3.
+This project's Supabase issues **ES256 (asymmetric)** tokens with a `kid`, verified
+against the project's JWKS endpoint. We fetch + cache those public keys and verify
+by key id. An HS256 path (legacy shared secret) is kept as a fallback so tokens
+signed with SUPABASE_JWT_SECRET also validate — harmless since that secret is
+backend-only.
 """
 
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient
 
 from .config import get_settings
 
 _settings = get_settings()
 _bearer = HTTPBearer(auto_error=False)
 
-# Supabase access tokens carry aud="authenticated".
 _EXPECTED_AUDIENCE = "authenticated"
+_ASYMMETRIC_ALGS = ["ES256", "RS256"]
+
+# JWKS endpoint for the project; keys are cached (refreshed periodically).
+_JWKS_URL = f"{_settings.supabase_url}/auth/v1/.well-known/jwks.json"
+_jwks_client = (
+    PyJWKClient(_JWKS_URL, cache_keys=True) if _settings.supabase_url else None
+)
 
 
 def _credentials_error(detail: str) -> HTTPException:
@@ -30,6 +37,29 @@ def _credentials_error(detail: str) -> HTTPException:
     )
 
 
+def _decode(token: str) -> dict:
+    """Verify the token. ES256/RS256 via JWKS; HS256 via the shared secret."""
+    alg = jwt.get_unverified_header(token).get("alg", "")
+
+    if alg == "HS256":
+        return jwt.decode(
+            token,
+            _settings.supabase_jwt_secret,
+            algorithms=["HS256"],
+            audience=_EXPECTED_AUDIENCE,
+        )
+
+    if _jwks_client is None:
+        raise jwt.InvalidTokenError("JWKS not configured (SUPABASE_URL missing)")
+    signing_key = _jwks_client.get_signing_key_from_jwt(token)
+    return jwt.decode(
+        token,
+        signing_key.key,
+        algorithms=_ASYMMETRIC_ALGS,
+        audience=_EXPECTED_AUDIENCE,
+    )
+
+
 def get_current_user_id(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> str:
@@ -37,18 +67,14 @@ def get_current_user_id(
     if creds is None or not creds.credentials:
         raise _credentials_error("Missing bearer token")
 
-    token = creds.credentials
     try:
-        payload = jwt.decode(
-            token,
-            _settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience=_EXPECTED_AUDIENCE,
-        )
+        payload = _decode(creds.credentials)
     except jwt.ExpiredSignatureError:
         raise _credentials_error("Token expired")
     except jwt.InvalidTokenError as exc:
         raise _credentials_error(f"Invalid token: {exc}")
+    except Exception as exc:  # JWKS fetch / key errors
+        raise _credentials_error(f"Token verification failed: {exc}")
 
     user_id = payload.get("sub")
     if not user_id:
