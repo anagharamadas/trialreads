@@ -1,63 +1,65 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/AuthProvider";
 import { RequireAuth } from "@/components/RequireAuth";
-import { api } from "@/lib/api";
+import { Header } from "@/components/Header";
+import { BookCover } from "@/components/BookCover";
+import { api, type Book } from "@/lib/api";
 
-function Home() {
-  const { session, signOut } = useAuth();
-  const router = useRouter();
-  const [count, setCount] = useState<number | null>(null);
+function Shelf() {
+  const [books, setBooks] = useState<Book[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Stage 1 smoke test: prove the JWT reaches the backend and returns our books.
   useEffect(() => {
     api
       .listBooks()
-      .then((books) => setCount(books.length))
+      .then(setBooks)
       .catch((e) => setError(String(e)));
   }, []);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="text-4xl text-ink">TrialReads</h1>
-      <p className="mt-2 text-ink-soft">
-        Signed in as <span className="font-medium">{session?.user.email}</span>
-      </p>
+    <div className="min-h-screen">
+      <Header />
+      <main className="mx-auto max-w-6xl px-6 py-10">
+        <div className="mb-8 flex items-baseline justify-between">
+          <h1 className="text-3xl text-ink">Your Library</h1>
+          {books && (
+            <span className="text-sm text-ink-soft">
+              {books.length} {books.length === 1 ? "book" : "books"}
+            </span>
+          )}
+        </div>
 
-      <div className="mt-8 rounded-lg bg-white/60 p-6 shadow-card">
-        <h2 className="text-xl">Backend connection</h2>
-        {error ? (
-          <p className="mt-2 text-accent">Error: {error}</p>
-        ) : count === null ? (
-          <p className="mt-2 text-ink-soft">Checking…</p>
-        ) : (
-          <p className="mt-2 text-ink">
-            ✅ Your library has <strong>{count}</strong> books. (Shelf UI arrives in
-            Stage 2.)
-          </p>
+        {error && <p className="text-accent">Error: {error}</p>}
+
+        {!books && !error && (
+          <p className="text-ink-soft">Loading your shelf…</p>
         )}
-      </div>
 
-      <button
-        onClick={async () => {
-          await signOut();
-          router.replace("/login");
-        }}
-        className="mt-8 rounded-md bg-accent px-4 py-2 text-white hover:bg-accent-hover"
-      >
-        Sign out
-      </button>
-    </main>
+        {books && books.length === 0 && (
+          <div className="rounded-lg bg-white/60 p-10 text-center shadow-card">
+            <p className="text-ink-soft">
+              Your shelf is empty. Adding books arrives in the next step.
+            </p>
+          </div>
+        )}
+
+        {books && books.length > 0 && (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {books.map((b) => (
+              <BookCover key={b.id} book={b} />
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
   );
 }
 
 export default function Page() {
   return (
     <RequireAuth>
-      <Home />
+      <Shelf />
     </RequireAuth>
   );
 }

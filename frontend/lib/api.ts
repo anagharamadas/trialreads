@@ -56,6 +56,12 @@ export const api = {
   deleteBook: (id: number) =>
     request<void>(`/library/${id}`, { method: "DELETE" }),
 
+  // Covers (Google Books via backend)
+  getCover: (title: string, author = "") =>
+    request<{ cover_url: string | null }>(
+      `/covers?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`
+    ),
+
   // AI
   summarise: (book_name: string, author_name = "") =>
     request<{ summary: string }>("/summarise", {

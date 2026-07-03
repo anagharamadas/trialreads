@@ -41,3 +41,10 @@ try:
     app.include_router(_ai.router)
 except ImportError:
     pass
+
+try:
+    from .routers import covers as _covers
+
+    app.include_router(_covers.router)
+except ImportError:
+    pass

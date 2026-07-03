@@ -21,6 +21,7 @@ class BookUpdate(BaseModel):
     author: Optional[str] = None
     status: Optional[Status] = None
     year: Optional[int] = Field(default=None, ge=1000, le=2200)
+    cover_url: Optional[str] = None
 
 
 class Book(BaseModel):
