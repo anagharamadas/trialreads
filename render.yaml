@@ -1,0 +1,39 @@
+# Render Blueprint for the TrialReads backend (FastAPI).
+# In Render: New → Blueprint → connect this repo. Render reads this file, creates
+# the service, and prompts for the `sync: false` secrets in the dashboard.
+services:
+  - type: web
+    name: trialreads-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.9"
+      # Lock CORS to the Vercel domain in production (no localhost).
+      - key: CORS_ALLOW_LOCALHOST
+        value: "false"
+      - key: DEBUG
+        value: "false"
+      # ── Secrets: set these in the Render dashboard (not stored in git) ──
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_BOOKS_API_KEY
+        sync: false
+      # The frontend origin(s) allowed by CORS — set to your Vercel URL, e.g.
+      # https://trialreads.vercel.app  (comma-separated for multiple).
+      - key: CORS_ORIGINS
+        sync: false

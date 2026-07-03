@@ -31,8 +31,11 @@ class Settings(BaseSettings):
     port: int = 8000
     host: str = "0.0.0.0"
 
-    # CORS — comma-or-JSON list of allowed origins
+    # CORS — comma-or-JSON list of allowed origins (e.g. the Vercel domain in prod)
     cors_origins: str = "http://localhost:3000"
+    # Allow any localhost port (dev convenience). Set false in production so only
+    # the explicit cors_origins (your Vercel domain) are permitted.
+    cors_allow_localhost: bool = True
 
     @property
     def cors_origins_list(self) -> list[str]:
