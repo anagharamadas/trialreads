@@ -66,3 +66,10 @@ try:
     app.include_router(_covers.router)
 except ImportError:
     pass
+
+try:
+    from .routers import shelves as _shelves
+
+    app.include_router(_shelves.router)
+except ImportError:
+    pass

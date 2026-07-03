@@ -67,3 +67,70 @@ class LibraryQueryRequest(BaseModel):
 class LibraryQueryResponse(BaseModel):
     answer: str
     sql: Optional[str] = None
+
+
+# ── Shelves (Phase 2) ──
+ShelfBookSource = Literal["user", "agent"]
+
+
+class ShelfCreate(BaseModel):
+    name: str = Field(min_length=1)
+    description: Optional[str] = None
+
+
+class ShelfUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1)
+    description: Optional[str] = None
+
+
+class Shelf(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    book_count: int = 0
+    created_at: Optional[str] = None
+
+
+class ShelfBookCreate(BaseModel):
+    title: str = Field(min_length=1)
+    author: Optional[str] = None
+    cover_url: Optional[str] = None
+    reason: Optional[str] = None
+    reading_order: Optional[int] = None
+    library_book_id: Optional[int] = None
+    added_by: ShelfBookSource = "user"
+
+
+class ShelfBookBulkItem(BaseModel):
+    title: str = Field(min_length=1)
+    author: Optional[str] = None
+    cover_url: Optional[str] = None
+    reason: Optional[str] = None
+    reading_order: Optional[int] = None
+    library_book_id: Optional[int] = None
+
+
+class ShelfBookBulkCreate(BaseModel):
+    items: list[ShelfBookBulkItem]
+    added_by: ShelfBookSource = "agent"
+
+
+class ShelfBookUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1)
+    author: Optional[str] = None
+    cover_url: Optional[str] = None
+    reason: Optional[str] = None
+    reading_order: Optional[int] = None
+    library_book_id: Optional[int] = None
+
+
+class ShelfBook(BaseModel):
+    id: str
+    shelf_id: str
+    library_book_id: Optional[int] = None
+    title: str
+    author: Optional[str] = None
+    cover_url: Optional[str] = None
+    reason: Optional[str] = None
+    reading_order: Optional[int] = None
+    added_by: ShelfBookSource
