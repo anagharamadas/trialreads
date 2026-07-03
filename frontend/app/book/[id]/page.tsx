@@ -8,6 +8,7 @@ import { Header } from "@/components/Header";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Modal } from "@/components/Modal";
 import { BookForm } from "@/components/BookForm";
+import { Recommendations } from "@/components/Recommendations";
 import { api, type Book } from "@/lib/api";
 
 function BookDetail() {
@@ -17,6 +18,8 @@ function BookDetail() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarising, setSummarising] = useState(false);
 
   useEffect(() => {
     api
@@ -28,6 +31,19 @@ function BookDetail() {
       })
       .catch((e) => setError(String(e)));
   }, [id]);
+
+  async function handleSummarise() {
+    if (!book) return;
+    setSummarising(true);
+    try {
+      const res = await api.summarise(book.book, book.author ?? "");
+      setSummary(res.summary);
+    } catch (e) {
+      setSummary(`Error: ${String(e)}`);
+    } finally {
+      setSummarising(false);
+    }
+  }
 
   async function handleDelete() {
     if (!book) return;
@@ -95,10 +111,27 @@ function BookDetail() {
                 </button>
               </div>
 
-              <p className="mt-8 text-sm text-ink-soft">
-                AI actions (summarise, recommend) arrive in the next step.
-              </p>
             </div>
+          </div>
+        )}
+
+        {book && (
+          <div className="mt-10">
+            <button
+              onClick={handleSummarise}
+              disabled={summarising}
+              className="rounded-md border border-cream-300 px-4 py-2 text-ink hover:bg-cream-200 disabled:opacity-60"
+            >
+              {summarising ? "Summarising…" : "Summarise first 3 chapters"}
+            </button>
+
+            {summary && (
+              <div className="mt-4 whitespace-pre-wrap rounded-lg bg-white/60 p-6 text-sm leading-relaxed text-ink shadow-card">
+                {summary}
+              </div>
+            )}
+
+            <Recommendations bookName={book.book} authorName={book.author ?? ""} />
           </div>
         )}
       </main>

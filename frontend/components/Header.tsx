@@ -11,9 +11,19 @@ export function Header() {
   return (
     <header className="sticky top-0 z-10 border-b border-cream-300 bg-cream/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="/" className="text-2xl font-serif text-ink">
-          TrialReads
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/" className="text-2xl font-serif text-ink">
+            TrialReads
+          </Link>
+          <nav className="flex gap-4 text-sm">
+            <Link href="/" className="text-ink-soft hover:text-ink">
+              Library
+            </Link>
+            <Link href="/chat" className="text-ink-soft hover:text-ink">
+              Chat
+            </Link>
+          </nav>
+        </div>
         <div className="flex items-center gap-4 text-sm">
           <span className="hidden text-ink-soft sm:inline">
             {session?.user.email}
