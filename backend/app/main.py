@@ -15,7 +15,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+    # Explicit allowlist (e.g. the deployed Vercel domain) from settings, PLUS
+    # any localhost port for local dev — Next.js auto-bumps 3000 -> 3001/3002…
+    # when a port is taken, and a hardcoded single port silently breaks every
+    # API call with a CORS preflight failure.
     allow_origins=settings.cors_origins_list,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
