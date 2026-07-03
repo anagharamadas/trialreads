@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Header } from "@/components/Header";
 import { BookCover } from "@/components/BookCover";
+import { CoverGrid } from "@/components/CoverGrid";
 import { Modal } from "@/components/Modal";
 import { BookForm } from "@/components/BookForm";
 import {
@@ -83,11 +84,11 @@ function Shelf() {
         )}
 
         {visible && visible.length > 0 && (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          <CoverGrid>
             {visible.map((b) => (
               <BookCover key={b.id} book={b} />
             ))}
-          </div>
+          </CoverGrid>
         )}
       </main>
 
