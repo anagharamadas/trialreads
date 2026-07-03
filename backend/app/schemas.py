@@ -134,3 +134,31 @@ class ShelfBook(BaseModel):
     reason: Optional[str] = None
     reading_order: Optional[int] = None
     added_by: ShelfBookSource
+
+
+# ── Curation agent (Phase 2, M5) ──
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+
+class CurateRequest(BaseModel):
+    messages: list[ChatMessage]
+
+
+class CurateItem(BaseModel):
+    title: str
+    author: str = ""
+    cover_url: Optional[str] = None
+    reason: str = ""
+    reading_order: int
+
+
+class CurateProposal(BaseModel):
+    overview: str
+    items: list[CurateItem]
+
+
+class CurateResponse(BaseModel):
+    reply: str
+    proposal: Optional[CurateProposal] = None

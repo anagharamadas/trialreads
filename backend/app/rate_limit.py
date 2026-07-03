@@ -19,8 +19,14 @@ from .db import engine
 settings = get_settings()
 
 
-def rate_limited_user(user_id: str = Depends(get_current_user_id)) -> str:
-    """Increment today's counter for this user; 429 if over the daily cap."""
+def enforce_daily_limit(user_id: str) -> None:
+    """Increment today's AI counter for this user; raise 429 if over the cap.
+
+    Exposed as a plain function so endpoints that must run an ownership check
+    first (e.g. /curate) can call it only after that check passes — a probe of
+    someone else's shelf then 404s without consuming the prober's quota or
+    running paid inference.
+    """
     with engine.begin() as conn:
         count = conn.execute(
             text(
@@ -41,4 +47,9 @@ def rate_limited_user(user_id: str = Depends(get_current_user_id)) -> str:
                 "Try again tomorrow."
             ),
         )
+
+
+def rate_limited_user(user_id: str = Depends(get_current_user_id)) -> str:
+    """Dependency: authenticate + enforce the daily AI cap, return user_id."""
+    enforce_daily_limit(user_id)
     return user_id

@@ -1,0 +1,161 @@
+"""Shelf-curation agent (Phase 2, M5).
+
+Two-stage design, chosen for reliability with gpt-4o-mini:
+
+  1. A LangGraph ReAct agent (create_react_agent, same pattern as book_agent.py)
+     with a single tool, search_google_books — its only research window. It asks
+     clarifying questions, researches, and (when ready) presents a reading list.
+  2. A structured-output extraction pass (with_structured_output) reads the
+     agent's latest message and reliably pulls out an ordered list if one is
+     present — far more dependable than asking gpt-4o-mini to emit a nested
+     tool call itself.
+
+Grounding is enforced by construction: every extracted book is re-validated
+against Google Books (`_ground`); anything it can't confirm is dropped, and the
+cover image comes from the validated record. The agent never writes to the DB —
+writes happen only when the user accepts, via /shelves/{id}/books/bulk.
+"""
+
+import logging
+import os
+
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
+from pydantic import BaseModel, Field
+
+from ..config import get_settings
+from . import google_books
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+MAX_HISTORY = 20
+RECURSION_LIMIT = 16
+MAX_ITEMS = 10
+
+RESEARCH_PROMPT = (
+    "You are TrialReads' reading-list curator. You help a user build an ordered "
+    "reading list (a 'shelf') that takes them from foundations to a specific goal.\n\n"
+    "1. If the user's goal is vague, ask 2 to 4 focused clarifying questions "
+    "BEFORE recommending anything — current knowledge level, time budget, "
+    "theory-vs-practice preference, and any region-specific angle. Ask, then "
+    "stop and wait for their answer.\n"
+    "2. Once the goal is clear, use the search_google_books tool to find and "
+    "VERIFY candidate books. You may ONLY recommend books that appear in the "
+    "tool's results — never invent titles or authors from memory.\n"
+    "3. When ready, present a reading list of 5 to 10 books as a numbered list in "
+    "reading order (foundations first, building toward the goal). For each book "
+    "give 'Title by Author' and a one-line reason. Start with a one-sentence "
+    "overview of how the sequence builds toward the goal."
+)
+
+_EXTRACT_PROMPT = (
+    "You extract a structured reading list from an assistant's message.\n"
+    "If the message presents a FINAL, ordered list of recommended books, set "
+    "is_reading_list=true, copy each book's title, author, and its one-line "
+    "reason IN THE ORDER GIVEN, provide a one-sentence overview, and a one- or "
+    "two-sentence short_reply to show the user.\n"
+    "If the message is only asking clarifying questions, or does not present a "
+    "concrete list of books, set is_reading_list=false and leave the rest empty."
+)
+
+
+@tool
+def search_google_books(query: str) -> str:
+    """Search Google Books for REAL books to find and verify candidates.
+
+    Use this before recommending anything. Returns up to 5 results with title,
+    author, year and a short description. You may only recommend books that
+    appear in results from this tool.
+    """
+    res = google_books.search(query, 5, settings.google_books_api_key)
+    if not res:
+        return "No results found for that query."
+    lines = []
+    for i, b in enumerate(res, 1):
+        authors = ", ".join(b["authors"]) if b["authors"] else "Unknown"
+        lines.append(
+            f"{i}. {b['title']} — {authors} ({b['published_year'] or 'n.d.'}): "
+            f"{b['description'][:160]}"
+        )
+    return "\n".join(lines)
+
+
+class _ExtractedItem(BaseModel):
+    title: str
+    author: str = ""
+    reason: str = ""
+
+
+class _Extracted(BaseModel):
+    is_reading_list: bool = Field(
+        description="true only if the message presents a final ordered list of books"
+    )
+    short_reply: str = Field(default="", description="one or two sentences for the user")
+    overview: str = Field(default="", description="one-sentence overview of the sequence")
+    items: list[_ExtractedItem] = Field(default_factory=list)
+
+
+def _ground(overview: str, items: list[_ExtractedItem]) -> dict | None:
+    """Re-validate every proposed book against Google Books; drop the rest."""
+    grounded = []
+    for it in items[:MAX_ITEMS]:
+        title = (it.title or "").strip()
+        if not title:
+            continue
+        gb = google_books.validate(title, (it.author or "").strip(), settings.google_books_api_key)
+        if gb is None:
+            logger.info("curate: dropped unverifiable book %r", title)
+            continue
+        grounded.append(
+            {
+                "title": gb["title"] or title,
+                "author": ", ".join(gb["authors"]) if gb.get("authors") else (it.author or ""),
+                "cover_url": gb.get("cover_url") or None,
+                "reason": (it.reason or "").strip(),
+                "reading_order": 0,
+            }
+        )
+    if not grounded:
+        return None
+    for i, g in enumerate(grounded, 1):
+        g["reading_order"] = i
+    return {"overview": (overview or "").strip(), "items": grounded}
+
+
+def run_curation(messages: list[dict], api_key: str) -> dict:
+    """Run one agent turn over the (capped) history. Returns {reply, proposal}."""
+    os.environ["OPENAI_API_KEY"] = api_key
+
+    # Stage 1: research + conversation.
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2, api_key=api_key)
+    agent = create_react_agent(
+        llm, tools=[search_google_books], prompt=RESEARCH_PROMPT
+    )
+    result = agent.invoke(
+        {"messages": messages[-MAX_HISTORY:]}, config={"recursion_limit": RECURSION_LIMIT}
+    )
+    msgs = result["messages"]
+    agent_reply = msgs[-1].content if msgs else ""
+
+    tokens = sum(
+        (getattr(m, "usage_metadata", None) or {}).get("total_tokens", 0) for m in msgs
+    )
+
+    # Stage 2: structured extraction of a reading list, if present.
+    extractor = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
+    ex: _Extracted = extractor.with_structured_output(_Extracted).invoke(
+        [SystemMessage(content=_EXTRACT_PROMPT), HumanMessage(content=agent_reply)]
+    )
+
+    proposal = None
+    reply = agent_reply
+    if ex.is_reading_list and ex.items:
+        proposal = _ground(ex.overview, ex.items)
+        if proposal:
+            reply = ex.short_reply or "Here's a reading list to get you there."
+
+    logger.info("curate: tokens=%s, proposed=%s", tokens, proposal is not None)
+    return {"reply": reply, "proposal": proposal}

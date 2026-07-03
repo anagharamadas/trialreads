@@ -19,8 +19,12 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from ..auth import get_current_user_id
+from ..config import get_settings
 from ..db import engine
+from ..rate_limit import enforce_daily_limit
 from ..schemas import (
+    CurateRequest,
+    CurateResponse,
     Shelf,
     ShelfBook,
     ShelfBookBulkCreate,
@@ -29,8 +33,10 @@ from ..schemas import (
     ShelfCreate,
     ShelfUpdate,
 )
+from ..services import curation_agent
 
 router = APIRouter(prefix="/shelves", tags=["shelves"])
+settings = get_settings()
 
 _SHELF_COLS = "id::text AS id, name, description, created_at::text AS created_at"
 _BOOK_COLS = (
@@ -239,6 +245,27 @@ def update_shelf_book(
     if row is None:
         raise HTTPException(status_code=404, detail="Book not found on this shelf")
     return ShelfBook(**row)
+
+
+@router.post("/{shelf_id}/curate", response_model=CurateResponse)
+def curate_shelf(
+    shelf_id: str,
+    payload: CurateRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Conversational curation agent. Verifies shelf ownership BEFORE consuming
+    the daily AI quota or running any paid inference, then returns a reply and
+    (when ready) a structured, Google-Books-grounded reading-list proposal.
+    Never writes to the DB — the user accepts via .../books/bulk.
+    """
+    sid = _valid_uuid(shelf_id, "Shelf")
+    with engine.connect() as conn:
+        _assert_shelf_owner(conn, sid, user_id)
+    enforce_daily_limit(user_id)  # after ownership: probes don't burn quota
+    result = curation_agent.run_curation(
+        [m.model_dump() for m in payload.messages], settings.openai_api_key
+    )
+    return CurateResponse(reply=result["reply"], proposal=result["proposal"])
 
 
 @router.delete(
