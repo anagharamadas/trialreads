@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Rate limiting (M6): max AI calls (summarise + recommend + query) per user/day
     daily_ai_limit: int = 50
 
+    # Error monitoring (M6): Sentry DSN (empty = disabled)
+    sentry_dsn: str = ""
+
     # Server
     debug: bool = False
     port: int = 8000

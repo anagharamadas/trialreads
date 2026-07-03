@@ -7,6 +7,16 @@ from .config import get_settings
 
 settings = get_settings()
 
+# Error monitoring (no-op unless SENTRY_DSN is set).
+if settings.sentry_dsn:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        traces_sample_rate=0.1,
+        environment="development" if settings.debug else "production",
+    )
+
 app = FastAPI(
     title="TrialReads API",
     description="Book summaries, personal library (text-to-SQL), and recommendations.",
