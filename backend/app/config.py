@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Google Books (M3)
     google_books_api_key: str = ""
 
+    # Rate limiting (M6): max AI calls (summarise + recommend + query) per user/day
+    daily_ai_limit: int = 50
+
     # Server
     debug: bool = False
     port: int = 8000

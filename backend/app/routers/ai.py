@@ -7,8 +7,8 @@ per-user rate limiting in M6).
 
 from fastapi import APIRouter, Depends
 
-from ..auth import get_current_user_id
 from ..config import get_settings
+from ..rate_limit import rate_limited_user
 from ..schemas import (
     Recommendation,
     RecommendRequest,
@@ -23,7 +23,7 @@ settings = get_settings()
 
 
 @router.post("/summarise", response_model=SummariseResponse)
-def summarise(payload: SummariseRequest, user_id: str = Depends(get_current_user_id)):
+def summarise(payload: SummariseRequest, user_id: str = Depends(rate_limited_user)):
     text = summariser.get_summary(
         payload.book_name, payload.author_name or "", settings.openai_api_key
     )
@@ -31,7 +31,7 @@ def summarise(payload: SummariseRequest, user_id: str = Depends(get_current_user
 
 
 @router.post("/recommend", response_model=RecommendResponse)
-def recommend(payload: RecommendRequest, user_id: str = Depends(get_current_user_id)):
+def recommend(payload: RecommendRequest, user_id: str = Depends(rate_limited_user)):
     result = recommendations.recommend(
         payload.book_name, payload.author_name or "", settings.openai_api_key
     )

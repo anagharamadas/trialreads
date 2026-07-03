@@ -11,6 +11,7 @@ from sqlalchemy import text
 from ..auth import get_current_user_id
 from ..config import get_settings
 from ..db import engine
+from ..rate_limit import rate_limited_user
 from ..schemas import Book, BookCreate, BookUpdate, LibraryQueryRequest, LibraryQueryResponse
 from ..services import library_query
 
@@ -35,7 +36,7 @@ def list_books(user_id: str = Depends(get_current_user_id)):
 
 @router.post("/query", response_model=LibraryQueryResponse)
 def query_library(
-    payload: LibraryQueryRequest, user_id: str = Depends(get_current_user_id)
+    payload: LibraryQueryRequest, user_id: str = Depends(rate_limited_user)
 ):
     """Answer a natural-language question over ONLY the current user's library.
 

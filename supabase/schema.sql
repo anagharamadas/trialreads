@@ -72,6 +72,18 @@ create or replace view public.my_library
 
 grant select on public.my_library to authenticated;
 
+-- ── 5. Per-user daily AI usage counter (rate limiting, Milestone 6) ───────
+-- The backend (service role) increments this before each AI call and returns
+-- 429 when a user exceeds the daily cap. Durable across Render cold starts.
+create table if not exists public.ai_usage (
+    user_id uuid not null references auth.users (id) on delete cascade,
+    day     date not null default current_date,
+    count   integer not null default 0,
+    primary key (user_id, day)
+);
+alter table public.ai_usage enable row level security;
+-- No policies: only the backend service role (which bypasses RLS) touches this.
+
 -- ════════════════════════════════════════════════════════════════════════
 -- ISOLATION MODEL (Milestone 2, highest-risk step):
 --   /library/query runs the LLM-generated SQL on a connection that does
