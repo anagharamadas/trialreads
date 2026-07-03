@@ -70,6 +70,13 @@ export default function SignupPage() {
             Sign in
           </Link>
         </p>
+        <p className="mt-8 text-center text-xs text-ink-soft">
+          By signing up you agree to our{" "}
+          <Link href="/privacy" className="hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </main>
   );
