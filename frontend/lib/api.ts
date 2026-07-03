@@ -47,6 +47,26 @@ export type ShelfBookInput = {
   library_book_id?: number | null;
 };
 
+export type CurateProposalItem = {
+  title: string;
+  author: string;
+  cover_url: string | null;
+  reason: string;
+  reading_order: number;
+};
+
+export type CurateProposal = {
+  overview: string;
+  items: CurateProposalItem[];
+};
+
+export type CurateResponse = {
+  reply: string;
+  proposal: CurateProposal | null;
+};
+
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -135,5 +155,10 @@ export const api = {
       }),
     removeBook: (id: string, bookId: string) =>
       request<void>(`/shelves/${id}/books/${bookId}`, { method: "DELETE" }),
+    curate: (id: string, messages: ChatMessage[]) =>
+      request<CurateResponse>(`/shelves/${id}/curate`, {
+        method: "POST",
+        body: JSON.stringify({ messages }),
+      }),
   },
 };

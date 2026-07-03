@@ -8,6 +8,7 @@ import { Header } from "@/components/Header";
 import { CoverGrid } from "@/components/CoverGrid";
 import { ShelfBookCard } from "@/components/ShelfBookCard";
 import { Modal } from "@/components/Modal";
+import { CurationChat } from "@/components/CurationChat";
 import { api, type Shelf, type ShelfBook } from "@/lib/api";
 
 function ShelfDetail() {
@@ -18,6 +19,7 @@ function ShelfDetail() {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [curating, setCurating] = useState(false);
 
   const load = useCallback(() => {
     api.shelves
@@ -89,8 +91,14 @@ function ShelfDetail() {
             </div>
             <div className="flex flex-shrink-0 gap-2">
               <button
-                onClick={() => setAdding(true)}
+                onClick={() => setCurating(true)}
                 className="rounded-md bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover"
+              >
+                ✨ Build with AI
+              </button>
+              <button
+                onClick={() => setAdding(true)}
+                className="rounded-md border border-cream-300 px-4 py-2 text-sm text-ink hover:bg-cream-200"
               >
                 + Add book
               </button>
@@ -108,11 +116,10 @@ function ShelfDetail() {
           <div className="rounded-lg bg-white/60 p-10 text-center shadow-card">
             <p className="text-ink-soft">This shelf is empty.</p>
             <button
-              disabled
-              title="Coming soon"
-              className="mt-4 cursor-not-allowed rounded-md bg-accent/40 px-4 py-2 text-sm text-white"
+              onClick={() => setCurating(true)}
+              className="mt-4 rounded-md bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover"
             >
-              ✨ Build this shelf with AI (coming soon)
+              ✨ Build this shelf with AI
             </button>
           </div>
         )}
@@ -133,6 +140,14 @@ function ShelfDetail() {
           </CoverGrid>
         )}
       </main>
+
+      {curating && (
+        <CurationChat
+          shelfId={id}
+          onClose={() => setCurating(false)}
+          onAccepted={load}
+        />
+      )}
 
       {adding && (
         <AddBookModal
