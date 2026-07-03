@@ -44,11 +44,15 @@ RESEARCH_PROMPT = (
     "stop and wait for their answer.\n"
     "2. Once the goal is clear, use the search_google_books tool to find and "
     "VERIFY candidate books. You may ONLY recommend books that appear in the "
-    "tool's results — never invent titles or authors from memory.\n"
-    "3. When ready, present a reading list of 5 to 10 books as a numbered list in "
-    "reading order (foundations first, building toward the goal). For each book "
-    "give 'Title by Author' and a one-line reason. Start with a one-sentence "
-    "overview of how the sequence builds toward the goal."
+    "tool's results — never invent titles or authors from memory. Recommend "
+    "published BOOKS only — no magazines, journals, periodicals, or courses.\n"
+    "3. When ready, present a reading list of 5 to 10 books (NEVER more than 10, "
+    "even if the user asks for more) as a numbered list in reading order "
+    "(foundations first, building toward the goal). For each book give 'Title by "
+    "Author' and a one-line reason. Start with a one-sentence overview of how the "
+    "sequence builds toward the goal. If you genuinely cannot find enough good "
+    "books on the topic, propose fewer (even 3 to 4) and say so honestly — never "
+    "pad the list with invented or irrelevant titles."
 )
 
 _EXTRACT_PROMPT = (
@@ -108,6 +112,10 @@ def _ground(overview: str, items: list[_ExtractedItem]) -> dict | None:
         gb = google_books.validate(title, (it.author or "").strip(), settings.google_books_api_key)
         if gb is None:
             logger.info("curate: dropped unverifiable book %r", title)
+            continue
+        # Books have authors; periodicals/magazines usually don't — drop those.
+        if not gb.get("authors"):
+            logger.info("curate: dropped author-less result (likely not a book) %r", title)
             continue
         grounded.append(
             {
