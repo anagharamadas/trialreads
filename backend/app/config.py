@@ -39,16 +39,22 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> list[str]:
+        def clean(o: str) -> str:
+            # Browsers send the Origin with NO trailing slash and no path, so a
+            # value like "https://app.vercel.app/" must be normalized or it never
+            # matches. Also tolerate stray quotes/whitespace.
+            return o.strip().strip('"').strip("'").rstrip("/")
+
         raw = self.cors_origins.strip()
         if raw.startswith("["):
             # tolerate JSON-ish '["http://localhost:3000"]'
             import json
 
             try:
-                return [str(o) for o in json.loads(raw)]
+                return [clean(str(o)) for o in json.loads(raw)]
             except Exception:
                 pass
-        return [o.strip() for o in raw.split(",") if o.strip()]
+        return [clean(o) for o in raw.split(",") if clean(o)]
 
 
 @lru_cache
