@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
+from .telemetry import APP_VERSION, seconds_since_boot, setup_telemetry
 
 settings = get_settings()
 
@@ -22,6 +23,12 @@ app = FastAPI(
     description="Book summaries, personal library (text-to-SQL), and recommendations.",
     version="0.1.0",
 )
+
+# Telemetry must be configured BEFORE the routers below are imported: importing
+# them imports app.db, and the SQLAlchemy engine must be created after the
+# instrumentation patch to be traced. No-op unless OTEL_EXPORTER_OTLP_ENDPOINT
+# is set (structured JSON logging is configured either way).
+setup_telemetry(app)
 
 # Explicit allowlist (e.g. the deployed Vercel domain) from settings. In dev we
 # ALSO allow any localhost port via regex — Next.js auto-bumps 3000 -> 3001/3002…
@@ -42,7 +49,15 @@ app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 @app.get("/health", tags=["meta"])
 def health():
-    return {"status": "ok"}
+    """Cheap liveness probe: no auth, no DB, no external calls. Used by Render's
+    health check and Grafana Synthetic Monitoring. uptime_seconds makes Render
+    free-tier spin-downs visible (a small value right after traffic = cold start).
+    """
+    return {
+        "status": "ok",
+        "version": APP_VERSION,
+        "uptime_seconds": seconds_since_boot(),
+    }
 
 
 # Routers are added stage by stage (Stage B: library, Stage C/D: ai).

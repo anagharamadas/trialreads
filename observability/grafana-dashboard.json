@@ -1,0 +1,137 @@
+{
+  "__comment": "TrialReads RED dashboard (Phase 3, M3). Import via Grafana → Dashboards → New → Import. When prompted, pick your Grafana Cloud Prometheus (Mimir) datasource and your Tempo datasource. Metric/label names assume the stable HTTP semconv the backend opts into (http.server.request.duration in seconds) after Grafana's OTLP→Prometheus translation: http_server_request_duration_seconds_*, labels http_route / http_request_method / http_response_status_code / deployment_environment. If a panel is empty, verify the exact names in Explore first (see OBSERVABILITY.md) — translation details can change.",
+  "__inputs": [
+    { "name": "DS_PROM", "label": "Prometheus (Mimir)", "type": "datasource", "pluginId": "prometheus" },
+    { "name": "DS_TEMPO", "label": "Tempo", "type": "datasource", "pluginId": "tempo" }
+  ],
+  "title": "TrialReads — API RED",
+  "uid": "trialreads-red",
+  "editable": true,
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "env",
+        "label": "environment",
+        "type": "custom",
+        "query": "production,local",
+        "current": { "text": "production", "value": "production" }
+      }
+    ]
+  },
+  "panels": [
+    { "type": "row", "title": "CRUD endpoints (AI excluded so these stay readable)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+    {
+      "type": "timeseries",
+      "title": "Request rate by endpoint (req/s)",
+      "datasource": { "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{job=\"trialreads-api\", deployment_environment=\"$env\", http_route!~\"/summarise|/recommend|/library/query|/shelves/\\\\{shelf_id\\\\}/curate\"}[5m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "5xx error rate by endpoint (req/s)",
+      "datasource": { "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{job=\"trialreads-api\", deployment_environment=\"$env\", http_response_status_code=~\"5..\"}[5m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p50 / p95 / p99 — CRUD (s)",
+      "datasource": { "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"trialreads-api\", deployment_environment=\"$env\", http_route!~\"/summarise|/recommend|/library/query|/shelves/\\\\{shelf_id\\\\}/curate\"}[5m])))",
+          "legendFormat": "p50 {{http_route}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"trialreads-api\", deployment_environment=\"$env\", http_route!~\"/summarise|/recommend|/library/query|/shelves/\\\\{shelf_id\\\\}/curate\"}[5m])))",
+          "legendFormat": "p95 {{http_route}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"trialreads-api\", deployment_environment=\"$env\", http_route!~\"/summarise|/recommend|/library/query|/shelves/\\\\{shelf_id\\\\}/curate\"}[5m])))",
+          "legendFormat": "p99 {{http_route}}"
+        }
+      ]
+    },
+    { "type": "row", "title": "AI endpoints (seconds-scale latencies — own row on purpose)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 } },
+    {
+      "type": "timeseries",
+      "title": "AI request rate (req/s)",
+      "datasource": { "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
+      "targets": [
+        {
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{job=\"trialreads-api\", deployment_environment=\"$env\", http_route=~\"/summarise|/recommend|/library/query|/shelves/\\\\{shelf_id\\\\}/curate\"}[5m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI latency p50 / p95 (s)",
+      "datasource": { "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"trialreads-api\", deployment_environment=\"$env\", http_route=~\"/summarise|/recommend|/library/query|/shelves/\\\\{shelf_id\\\\}/curate\"}[5m])))",
+          "legendFormat": "p50 {{http_route}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"trialreads-api\", deployment_environment=\"$env\", http_route=~\"/summarise|/recommend|/library/query|/shelves/\\\\{shelf_id\\\\}/curate\"}[5m])))",
+          "legendFormat": "p95 {{http_route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI 5xx error rate (req/s)",
+      "datasource": { "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
+      "targets": [
+        {
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{job=\"trialreads-api\", deployment_environment=\"$env\", http_response_status_code=~\"5..\", http_route=~\"/summarise|/recommend|/library/query|/shelves/\\\\{shelf_id\\\\}/curate\"}[5m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    { "type": "row", "title": "Database + cold starts (from traces — TraceQL metrics)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 } },
+    {
+      "type": "timeseries",
+      "title": "DB span duration p50 / p95 (TraceQL metrics)",
+      "datasource": { "uid": "${DS_TEMPO}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"trialreads-api\" && span.db.system=\"postgresql\"} | quantile_over_time(duration, .5, .95)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Cold starts per hour (Render spin-ups)",
+      "datasource": { "uid": "${DS_TEMPO}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"trialreads-api\" && span.app.cold_start=true} | rate() by (span.http.route)"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39
+}

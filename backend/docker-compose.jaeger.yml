@@ -1,0 +1,18 @@
+# Local trace lab (Phase 3, M1): Jaeger all-in-one with native OTLP ingestion.
+#
+#   docker compose -f docker-compose.jaeger.yml up -d
+#   UI:  http://localhost:16686
+#
+# Point the backend at it in backend/.env:
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+#
+# Fully disposable — `docker compose -f docker-compose.jaeger.yml down` removes
+# everything (traces are in-memory only).
+services:
+  jaeger:
+    image: jaegertracing/jaeger:2.4.0   # Jaeger v2: OTLP (4317 gRPC / 4318 HTTP) on by default
+    container_name: trialreads-jaeger
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4318:4318"     # OTLP HTTP  (the backend exports here)
+      - "4317:4317"     # OTLP gRPC  (unused by us, standard to expose)

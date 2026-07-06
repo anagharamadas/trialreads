@@ -31,6 +31,19 @@ numpy==1.26.4
 # ─── Monitoring ───
 sentry-sdk[fastapi]==2.20.0    # error monitoring (active only when SENTRY_DSN set)
 
+# ─── Observability (Phase 3): OpenTelemetry traces/metrics/logs over OTLP ───
+# SDK 1.43.0 pairs with instrumentation 0.64b0 (contrib versioning: 1.x ↔ 0.(x+21)b0).
+# Active only when OTEL_EXPORTER_OTLP_ENDPOINT is set (see app/telemetry.py).
+opentelemetry-sdk==1.43.0
+opentelemetry-exporter-otlp-proto-http==1.43.0
+opentelemetry-instrumentation-fastapi==0.64b0
+opentelemetry-instrumentation-sqlalchemy==0.64b0
+opentelemetry-instrumentation-httpx==0.64b0
+
+# ─── LLM observability (Phase 3, M5): Langfuse v4 (needs Python ≥3.11) ───
+# Active only when LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY are set.
+langfuse==4.13.0
+
 # ─── Dev / test ───
 pytest==8.3.4
 httpx==0.28.1                  # FastAPI TestClient

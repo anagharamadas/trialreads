@@ -25,7 +25,7 @@ settings = get_settings()
 @router.post("/summarise", response_model=SummariseResponse)
 def summarise(payload: SummariseRequest, user_id: str = Depends(rate_limited_user)):
     text = summariser.get_summary(
-        payload.book_name, payload.author_name or "", settings.openai_api_key
+        payload.book_name, payload.author_name or "", settings.openai_api_key, user_id
     )
     return SummariseResponse(summary=text)
 
@@ -33,7 +33,7 @@ def summarise(payload: SummariseRequest, user_id: str = Depends(rate_limited_use
 @router.post("/recommend", response_model=RecommendResponse)
 def recommend(payload: RecommendRequest, user_id: str = Depends(rate_limited_user)):
     result = recommendations.recommend(
-        payload.book_name, payload.author_name or "", settings.openai_api_key
+        payload.book_name, payload.author_name or "", settings.openai_api_key, user_id
     )
     recs = [Recommendation(**r) for r in result["recommendations"]]
     return RecommendResponse(original_response=result["original_response"], recommendations=recs)

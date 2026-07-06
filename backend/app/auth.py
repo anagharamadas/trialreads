@@ -13,6 +13,7 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
+from opentelemetry import trace
 
 from .config import get_settings
 
@@ -79,4 +80,10 @@ def get_current_user_id(
     user_id = payload.get("sub")
     if not user_id:
         raise _credentials_error("Token missing subject (sub)")
+
+    # VERIFIED user_id onto the request span — a span attribute only (low
+    # volume, high cardinality is fine on traces). Never a metric label.
+    span = trace.get_current_span()
+    if span.is_recording():
+        span.set_attribute("app.user_id", user_id)
     return user_id

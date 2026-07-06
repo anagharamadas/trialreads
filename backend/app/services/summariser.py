@@ -10,9 +10,14 @@ import re
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from opentelemetry import trace
+
+from .. import llm_observability
+
+tracer = trace.get_tracer("trialreads.summarise")
 
 
-def get_summary(book_name: str, author_name: str, api_key: str) -> str:
+def get_summary(book_name: str, author_name: str, api_key: str, user_id: str = "") -> str:
     chat = ChatOpenAI(temperature=0, model="gpt-4o-mini", openai_api_key=api_key)
 
     prompt = ChatPromptTemplate.from_messages(
@@ -27,9 +32,13 @@ def get_summary(book_name: str, author_name: str, api_key: str) -> str:
     )
     author_clause = f" by {author_name}" if author_name else ""
 
-    response = (prompt | chat).invoke(
-        {"book_name": book_name, "author_clause": author_clause}
-    )
+    with tracer.start_as_current_span("summarise.generate") as span:
+        span.set_attribute("app.feature", "summarise")
+        span.set_attribute("app.book", book_name)
+        response = (prompt | chat).invoke(
+            {"book_name": book_name, "author_clause": author_clause},
+            config=llm_observability.langchain_config("summarise", user_id) or None,
+        )
 
     # Strip any <think>...</think> blocks (no-op for gpt-4o-mini; kept for parity).
     cleaned = re.sub(r"<think>.*?</think>", "", response.content, flags=re.DOTALL)

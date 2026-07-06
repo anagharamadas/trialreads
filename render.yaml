@@ -37,3 +37,21 @@ services:
       # https://trialreads.vercel.app  (comma-separated for multiple).
       - key: CORS_ORIGINS
         sync: false
+      # ── Observability (Phase 3). Leave the OTLP vars unset until you have a
+      # Grafana Cloud account; telemetry is a no-op without them. ──
+      - key: DEPLOYMENT_ENVIRONMENT
+        value: "production"
+      # From Grafana Cloud's OTLP setup flow (OTLP endpoint + Basic auth header).
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      - key: OTEL_EXPORTER_OTLP_HEADERS
+        sync: false
+      # ── Langfuse (M5) — LLM observability; unset = disabled ──
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: LANGFUSE_BASE_URL
+        value: "https://cloud.langfuse.com"
+      - key: LANGFUSE_TRACING_ENVIRONMENT
+        value: "production"

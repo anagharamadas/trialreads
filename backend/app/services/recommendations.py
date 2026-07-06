@@ -14,6 +14,11 @@ import urllib.parse
 
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
+from opentelemetry import trace
+
+from .. import llm_observability
+
+tracer = trace.get_tracer("trialreads.recommend")
 
 
 def generate_amazon_link(book_title: str, author_name: str) -> str:
@@ -81,9 +86,15 @@ def parse_recommendations(response_text: str) -> list[dict]:
     return recommendations
 
 
-def recommend(book_name: str, author_name: str, api_key: str) -> dict:
+def recommend(book_name: str, author_name: str, api_key: str, user_id: str = "") -> dict:
     chat = ChatOpenAI(temperature=0.1, model="gpt-4o-mini", openai_api_key=api_key)
-    response = chat.invoke([HumanMessage(content=_prompt(book_name, author_name))])
+    with tracer.start_as_current_span("recommend.generate") as span:
+        span.set_attribute("app.feature", "recommend")
+        span.set_attribute("app.book", book_name)
+        response = chat.invoke(
+            [HumanMessage(content=_prompt(book_name, author_name))],
+            config=llm_observability.langchain_config("recommend", user_id) or None,
+        )
     text = response.content
 
     recs = parse_recommendations(text)

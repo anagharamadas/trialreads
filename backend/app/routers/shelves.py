@@ -263,7 +263,7 @@ def curate_shelf(
         _assert_shelf_owner(conn, sid, user_id)
     enforce_daily_limit(user_id)  # after ownership: probes don't burn quota
     result = curation_agent.run_curation(
-        [m.model_dump() for m in payload.messages], settings.openai_api_key
+        [m.model_dump() for m in payload.messages], settings.openai_api_key, user_id
     )
     return CurateResponse(reply=result["reply"], proposal=result["proposal"])
 

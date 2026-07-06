@@ -21,6 +21,7 @@ import os
 from llama_index.core import SQLDatabase
 from llama_index.core.query_engine import NLSQLTableQueryEngine
 from llama_index.llms.openai import OpenAI
+from opentelemetry import trace
 from sqlalchemy import create_engine, event
 from sqlalchemy.pool import NullPool
 
@@ -28,6 +29,7 @@ from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+tracer = trace.get_tracer("trialreads.nl_sql")
 
 VIEW = "my_library"
 
@@ -70,19 +72,26 @@ def answer_query(user_query: str, user_id: str, api_key: str) -> dict:
     os.environ["OPENAI_API_KEY"] = api_key
 
     eng = _scoped_engine(user_id)
-    try:
-        sql_database = SQLDatabase(eng, include_tables=[VIEW], view_support=True)
-        llm = OpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
-        query_engine = NLSQLTableQueryEngine(
-            sql_database=sql_database,
-            tables=[VIEW],
-            llm=llm,
-            context_query_kwargs={VIEW: TABLE_CONTEXT},
-        )
-        response = query_engine.query(user_query)
-        sql = response.metadata.get("sql_query") if response.metadata else None
-        if sql:
-            logger.info("Generated SQL (user %s): %s", user_id, sql)
-        return {"answer": str(response), "sql": sql}
-    finally:
-        eng.dispose()
+    # Manual span: auto-instrumentation sees "an OpenAI call" and "a DB query"
+    # but can't know they form one unit of work (generate SQL → execute it).
+    # Exceptions are recorded and flip the span to error status automatically.
+    with tracer.start_as_current_span("nl_sql.generate_and_execute") as span:
+        span.set_attribute("app.feature", "nl-sql")
+        try:
+            sql_database = SQLDatabase(eng, include_tables=[VIEW], view_support=True)
+            llm = OpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
+            query_engine = NLSQLTableQueryEngine(
+                sql_database=sql_database,
+                tables=[VIEW],
+                llm=llm,
+                context_query_kwargs={VIEW: TABLE_CONTEXT},
+            )
+            response = query_engine.query(user_query)
+            sql = response.metadata.get("sql_query") if response.metadata else None
+            span.set_attribute("app.nl_sql.sql_generated", bool(sql))
+            if sql:
+                span.set_attribute("app.nl_sql.sql", sql)
+                logger.info("Generated SQL (user %s): %s", user_id, sql)
+            return {"answer": str(response), "sql": sql}
+        finally:
+            eng.dispose()

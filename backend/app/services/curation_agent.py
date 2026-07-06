@@ -23,13 +23,16 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
+from opentelemetry import trace
 from pydantic import BaseModel, Field
 
 from ..config import get_settings
+from .. import llm_observability
 from . import google_books
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+tracer = trace.get_tracer("trialreads.curate")
 
 MAX_HISTORY = 20
 RECURSION_LIMIT = 16
@@ -74,7 +77,10 @@ def search_google_books(query: str) -> str:
     author, year and a short description. You may only recommend books that
     appear in results from this tool.
     """
-    res = google_books.search(query, 5, settings.google_books_api_key)
+    with tracer.start_as_current_span("curate.tool.search_google_books") as span:
+        span.set_attribute("app.tool.query", query)
+        res = google_books.search(query, 5, settings.google_books_api_key)
+        span.set_attribute("app.tool.result_count", len(res))
     if not res:
         return "No results found for that query."
     lines = []
@@ -102,6 +108,7 @@ class _Extracted(BaseModel):
     items: list[_ExtractedItem] = Field(default_factory=list)
 
 
+@tracer.start_as_current_span("curate.ground")
 def _ground(overview: str, items: list[_ExtractedItem]) -> dict | None:
     """Re-validate every proposed book against Google Books; drop the rest."""
     grounded = []
@@ -133,7 +140,7 @@ def _ground(overview: str, items: list[_ExtractedItem]) -> dict | None:
     return {"overview": (overview or "").strip(), "items": grounded}
 
 
-def run_curation(messages: list[dict], api_key: str) -> dict:
+def run_curation(messages: list[dict], api_key: str, user_id: str = "") -> dict:
     """Run one agent turn over the (capped) history. Returns {reply, proposal}."""
     os.environ["OPENAI_API_KEY"] = api_key
 
@@ -142,21 +149,32 @@ def run_curation(messages: list[dict], api_key: str) -> dict:
     agent = create_react_agent(
         llm, tools=[search_google_books], prompt=RESEARCH_PROMPT
     )
-    result = agent.invoke(
-        {"messages": messages[-MAX_HISTORY:]}, config={"recursion_limit": RECURSION_LIMIT}
-    )
-    msgs = result["messages"]
-    agent_reply = msgs[-1].content if msgs else ""
+    with tracer.start_as_current_span("curate.agent_turn") as span:
+        span.set_attribute("app.feature", "curate")
+        span.set_attribute("app.curate.history_len", len(messages))
+        result = agent.invoke(
+            {"messages": messages[-MAX_HISTORY:]},
+            config={
+                "recursion_limit": RECURSION_LIMIT,
+                **llm_observability.langchain_config("curate", user_id),
+            },
+        )
+        msgs = result["messages"]
+        agent_reply = msgs[-1].content if msgs else ""
 
-    tokens = sum(
-        (getattr(m, "usage_metadata", None) or {}).get("total_tokens", 0) for m in msgs
-    )
+        tokens = sum(
+            (getattr(m, "usage_metadata", None) or {}).get("total_tokens", 0)
+            for m in msgs
+        )
+        span.set_attribute("app.curate.total_tokens", tokens)
 
     # Stage 2: structured extraction of a reading list, if present.
     extractor = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
-    ex: _Extracted = extractor.with_structured_output(_Extracted).invoke(
-        [SystemMessage(content=_EXTRACT_PROMPT), HumanMessage(content=agent_reply)]
-    )
+    with tracer.start_as_current_span("curate.extract"):
+        ex: _Extracted = extractor.with_structured_output(_Extracted).invoke(
+            [SystemMessage(content=_EXTRACT_PROMPT), HumanMessage(content=agent_reply)],
+            config=llm_observability.langchain_config("curate", user_id) or None,
+        )
 
     proposal = None
     reply = agent_reply

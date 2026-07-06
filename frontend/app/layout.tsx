@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 
@@ -16,6 +17,8 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>{children}</AuthProvider>
+        {/* Core Web Vitals RUM — no-op in dev; only reports on Vercel prod deploys */}
+        <SpeedInsights />
       </body>
     </html>
   );
