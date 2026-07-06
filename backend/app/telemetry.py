@@ -49,6 +49,11 @@ from opentelemetry import trace  # noqa: E402  (API only — safe before opt-in)
 # Render sets RENDER_GIT_COMMIT on every deploy; locally we fall back to "dev".
 APP_VERSION = os.getenv("RENDER_GIT_COMMIT", "")[:7] or "dev"
 
+# Flipped to True at the end of setup_telemetry(); surfaced in /health so you
+# can tell from the public endpoint whether the deployed process is exporting
+# (Render's free-tier logs make the startup line hard to retrieve).
+OTEL_ACTIVE = False
+
 # Process boot time — used for /health uptime and cold-start span attributes.
 # Render's free tier spins the instance down when idle; the first request after
 # a spin-up pays a large cold-start penalty that would silently pollute every
@@ -214,6 +219,8 @@ def setup_telemetry(app) -> None:
     # httpx: covers the OpenAI SDK's transport and our Google Books calls.
     HTTPXClientInstrumentor().instrument()
 
+    global OTEL_ACTIVE
+    OTEL_ACTIVE = True
     logger.info(
         "OpenTelemetry enabled: service=%s version=%s environment=%s endpoint=%s",
         resource.attributes.get("service.name"),

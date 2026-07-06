@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import telemetry
 from .config import get_settings
 from .telemetry import APP_VERSION, seconds_since_boot, setup_telemetry
 
@@ -57,6 +58,9 @@ def health():
         "status": "ok",
         "version": APP_VERSION,
         "uptime_seconds": seconds_since_boot(),
+        # True only when the OTLP env vars were present at startup — the
+        # definitive "is this process exporting to Grafana?" check.
+        "otel_enabled": telemetry.OTEL_ACTIVE,
     }
 
 
