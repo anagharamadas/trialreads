@@ -54,6 +54,8 @@ def health():
     health check and Grafana Synthetic Monitoring. uptime_seconds makes Render
     free-tier spin-downs visible (a small value right after traffic = cold start).
     """
+    import os
+
     return {
         "status": "ok",
         "version": APP_VERSION,
@@ -61,6 +63,13 @@ def health():
         # True only when the OTLP env vars were present at startup — the
         # definitive "is this process exporting to Grafana?" check.
         "otel_enabled": telemetry.OTEL_ACTIVE,
+        # TEMPORARY (Phase 3 M2 debugging): which OTEL_* variable NAMES the
+        # process sees, with value lengths — never values. Lets us distinguish
+        # "var not set at all" from "name typo" without Render log access.
+        # Remove once Grafana ingestion is confirmed.
+        "otel_env_seen": {
+            k: len(v) for k, v in os.environ.items() if k.upper().startswith("OTEL")
+        },
     }
 
 
