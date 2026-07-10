@@ -1,0 +1,6 @@
+{"id": "sum-01", "book": "Pride and Prejudice", "author": "Jane Austen", "must_mention": ["Bennet", "Bingley"], "checks": {"min_words": 300}, "note": "Ch1-3 introduce the Bennets and Mr Bingley renting Netherfield"}
+{"id": "sum-02", "book": "1984", "author": "George Orwell", "must_mention": ["Winston", "Big Brother"], "checks": {"min_words": 300}, "note": "Winston Smith, the telescreen, Big Brother"}
+{"id": "sum-03", "book": "The Great Gatsby", "author": "F. Scott Fitzgerald", "must_mention": ["Nick", "Daisy"], "checks": {"min_words": 300}, "note": "Nick Carraway narrates; West Egg; Tom and Daisy Buchanan"}
+{"id": "sum-04", "book": "To Kill a Mockingbird", "author": "Harper Lee", "must_mention": ["Scout", "Atticus"], "checks": {"min_words": 300}, "note": "Scout, Jem, Atticus Finch, Maycomb, Boo Radley"}
+{"id": "sum-05", "book": "The Hobbit", "author": "J.R.R. Tolkien", "must_mention": ["Bilbo", "Gandalf"], "checks": {"min_words": 300}, "note": "Bilbo Baggins, Gandalf, the dwarves, the trolls"}
+{"id": "sum-06", "book": "Harry Potter and the Philosopher's Stone", "author": "J.K. Rowling", "must_mention": ["Dursley", "Harry"], "checks": {"min_words": 300}, "note": "The Dursleys, Privet Drive, Harry, the letters"}

@@ -4,15 +4,9 @@ Where M1 (`run_eval.py`) scores locally and writes a Markdown report, this pushe
 the SAME golden set to a Langfuse **dataset** and runs an **experiment**, so every
 run's scores + traces land in the Langfuse UI for comparison over time. It reuses
 the M1 assets unchanged: the fixture-seeded `EVAL_USER_ID`, `datasets/nl_sql.jsonl`,
-and the LLM judge in `judges.py`.
-
-Design note: M1 promised `record_result()` as the seam for Langfuse. In practice
-the v3 SDK's `dataset.run_experiment()` inverts control (it drives the loop and
-auto-creates the dataset run, trace links, and dashboard URL) — more robust than
-hand-rolling `create_score`, so M2 uses it as a sibling runner rather than a hook
-inside M1's loop. The pass/scoring semantics are kept identical to run_eval:
-`sql_required` structural check + judge correctness, with `expect_incorrect`
-inverting the verdict for the negative control.
+and the LLM judge in `judges.py`. The Langfuse plumbing lives in `_experiment.py`,
+shared with the other feature runners; this file is just NL->SQL's task, evaluator,
+and item mapping.
 
     cd backend
     python -m evals.langfuse_experiment
@@ -23,31 +17,26 @@ fixture) in backend/.env.
 
 import sys
 
-from langfuse import Langfuse
 from langfuse.experiment import Evaluation
 
-from app import llm_observability
 from app.services import library_query
 
-from evals import config, judges, run_eval
+from evals import _experiment, config, judges, run_eval
 
 DATASET_NAME = "nl-sql-golden"
 
 
-def sync_dataset(lf: Langfuse, items: list[dict]) -> None:
-    """Upsert the golden items into a Langfuse dataset (idempotent via stable id)."""
-    lf.create_dataset(
-        name=DATASET_NAME,
-        description="NL->SQL golden Q&A over the fixture library (TrialReads P4).",
-    )
-    for it in items:
-        lf.create_dataset_item(
-            dataset_name=DATASET_NAME,
-            id=it["id"],  # stable id → re-running updates rather than duplicates
-            input=it["question"],
-            expected_output=str(it["expected"]),
-            metadata={"checks": it.get("checks", {}), "note": it.get("note")},
-        )
+def build_items() -> list[dict]:
+    """Normalise the golden jsonl into Langfuse dataset items."""
+    return [
+        {
+            "id": it["id"],
+            "input": it["question"],
+            "expected_output": str(it["expected"]),
+            "metadata": {"checks": it.get("checks", {}), "note": it.get("note")},
+        }
+        for it in run_eval.load_dataset()
+    ]
 
 
 def make_task(user_id: str, api_key: str):
@@ -100,48 +89,18 @@ def correctness_evaluator(*, input, output, expected_output=None, metadata=None,
 
 
 def main() -> int:
-    if not llm_observability.enabled():
-        print(
-            "ERROR: Langfuse keys not set. Add LANGFUSE_PUBLIC_KEY / "
-            "LANGFUSE_SECRET_KEY to backend/.env.",
-            file=sys.stderr,
-        )
-        return 2
     user_id = config.eval_user_id()
-    api_key = config.openai_api_key()
     if not user_id:
         print("ERROR: EVAL_USER_ID not set (seed the fixture first).", file=sys.stderr)
         return 2
-    if not api_key:
-        print("ERROR: OPENAI_API_KEY not configured.", file=sys.stderr)
-        return 2
-
-    lf = Langfuse()
-    if not lf.auth_check():
-        print("ERROR: Langfuse auth failed — check keys / LANGFUSE_HOST.", file=sys.stderr)
-        return 2
-
-    items = run_eval.load_dataset()
-    print(f"Syncing {len(items)} items to Langfuse dataset '{DATASET_NAME}'…")
-    sync_dataset(lf, items)
-
-    dataset = lf.get_dataset(DATASET_NAME)
-    print(f"Running experiment over {len(dataset.items)} items as user {user_id}…")
-    result = dataset.run_experiment(
+    return _experiment.run_experiment(
         name="nl-sql",
         description="NL->SQL feature over the fixture library",
-        task=make_task(user_id, api_key),
-        evaluators=[correctness_evaluator],
-        # Bounded: each task opens a NullPool DB connection + OpenAI calls; keep
-        # Postgres connections and rate limits sane.
-        max_concurrency=4,
+        langfuse_dataset=DATASET_NAME,
+        items=build_items(),
+        task=make_task(user_id, config.openai_api_key()),
+        evaluator=correctness_evaluator,
     )
-    lf.flush()
-
-    print("\n" + result.format())
-    if result.dataset_run_url:
-        print(f"\nView in Langfuse: {result.dataset_run_url}")
-    return 0
 
 
 if __name__ == "__main__":

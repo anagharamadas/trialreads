@@ -57,9 +57,11 @@ dataset-run URL. `correctness` is averaged over *all* items in the Langfuse UI,
 so the negative control's 0.0 pulls it below 1.0 by design — read `passed` as the
 headline.
 
-> **SDK note:** the installed SDK is `langfuse==3.0.1`; this runner uses the v3
-> `dataset.run_experiment()` API. `requirements.txt` still pins `4.13.0` (drift —
-> see project notes); align them before relying on a fresh install.
+> **SDK note:** uses the `dataset.run_experiment()` API, which is present with an
+> identical `Evaluation` signature on both `langfuse` 3.x and 4.x. The venv and
+> `requirements.txt` agree on `4.13.0`. Watch out for an Anaconda base install of
+> `langfuse` (3.0.1) leaking onto `PYTHONPATH` and shadowing the venv — run with
+> the venv active and no `conda` base env to be safe.
 
 ## Config (all optional, from `.env` / env)
 | Var | Default | Meaning |
