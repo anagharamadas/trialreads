@@ -201,3 +201,63 @@ def judge_recommendations(book: str, author: str, recommendations: str) -> Recom
             "recommendations": recommendations or "(none)",
         }
     )
+
+
+# ── Curation judge (M3) ───────────────────────────────────────────────────
+# The curation agent produces an ORDERED reading list toward a goal. Beyond the
+# structural checks (a grounded proposal of a sensible size), the two things a
+# human cares about are: are the books right for the goal, and is the order sane
+# (foundations first, building toward the goal)?
+
+
+class CurationVerdict(BaseModel):
+    """Judgement of a curated reading list against the stated goal."""
+
+    relevant: bool = Field(
+        description="True if the books genuinely suit someone pursuing the goal."
+    )
+    well_ordered: bool = Field(
+        description="True if the sequence builds sensibly (foundations first, "
+        "progressing toward the goal)."
+    )
+    score: float = Field(description="0.0-1.0 overall quality for the goal.")
+    rationale: str = Field(description="One sentence explaining the verdict.")
+
+
+_CURATION_SYSTEM = (
+    "You evaluate a reading-list curator. You are given a GOAL and an ordered "
+    "READING LIST (a one-line overview plus numbered 'Title by Author — reason' "
+    "entries). Judge:\n"
+    "- relevant: do the books genuinely suit someone pursuing the goal? A list "
+    "from an unrelated domain (e.g. physics books for a cooking goal) is NOT "
+    "relevant.\n"
+    "- well_ordered: does the sequence build foundations-first toward the goal?\n"
+    "- score: overall 0.0-1.0."
+)
+
+_curation_chain = None
+
+
+def _curation_judge_chain():
+    global _curation_chain
+    if _curation_chain is None:
+        llm = ChatOpenAI(
+            model=config.JUDGE_MODEL,
+            temperature=0,
+            openai_api_key=config.openai_api_key(),
+        )
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", _CURATION_SYSTEM),
+                ("human", "GOAL: {goal}\n\nREADING LIST:\n{reading_list}"),
+            ]
+        )
+        _curation_chain = prompt | llm.with_structured_output(CurationVerdict)
+    return _curation_chain
+
+
+def judge_curation(goal: str, reading_list: str) -> CurationVerdict:
+    """Score a curated reading list for relevance + ordering against the goal."""
+    return _curation_judge_chain().invoke(
+        {"goal": goal, "reading_list": reading_list or "(none)"}
+    )

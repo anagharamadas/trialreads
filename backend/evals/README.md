@@ -93,4 +93,8 @@ evals/
   - `recommend_experiment.py` — relevance judge + structure checks (count / fields /
     seed-excluded), with a relevance **negative control** (`checks.expect_irrelevant`:
     recommendations generated for an unrelated-genre book must be flagged irrelevant).
-  - Curation next, same pattern.
+  - `curation_experiment.py` — the agentic feature. Exercises BOTH behaviours
+    (`expect: clarify` → asks questions, no list; `expect: list` → grounded, ordered,
+    relevant reading list) + a relevance **negative control**. ⚠️ Hits the live
+    Google Books API (search + grounding), which rate-limits under bursts — runs
+    `max_concurrency=1`; a degraded run may need re-running.
