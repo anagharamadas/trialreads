@@ -1,0 +1,6 @@
+{"id": "rec-01", "book": "The Hobbit", "author": "J.R.R. Tolkien", "checks": {"expect_count": 5}, "note": "fantasy adventure — expect similar fantasy"}
+{"id": "rec-02", "book": "Murder on the Orient Express", "author": "Agatha Christie", "checks": {"expect_count": 5}, "note": "classic whodunit mystery"}
+{"id": "rec-03", "book": "The Martian", "author": "Andy Weir", "checks": {"expect_count": 5}, "note": "hard sci-fi survival"}
+{"id": "rec-04", "book": "Pride and Prejudice", "author": "Jane Austen", "checks": {"expect_count": 5}, "note": "classic romance / novel of manners"}
+{"id": "rec-05", "book": "Sapiens", "author": "Yuval Noah Harari", "checks": {"expect_count": 5}, "note": "popular non-fiction history"}
+{"id": "rec-neg-01", "book": "Pride and Prejudice", "author": "Jane Austen", "checks": {"expect_count": 5, "expect_irrelevant": true}, "recommend_for_book": "A Brief History of Time", "recommend_for_author": "Stephen Hawking", "note": "NEGATIVE CONTROL: judge told seed is Pride and Prejudice but recs are generated for a physics book — must flag relevant=false. If it passes as relevant, the relevance judge is broken."}
