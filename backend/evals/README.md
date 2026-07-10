@@ -87,5 +87,7 @@ evals/
 - **M1 (done):** scaffold + NL→SQL, offline.
 - **M2 (done):** Langfuse dataset experiment (`langfuse_experiment.py`) — reuses the
   M1 dataset + judge; records scores/traces to Langfuse.
-- **M3:** add summaries, recommend, curation — one feature per checkpoint, reusing
-  this harness.
+- **M3 (summariser done):** `summaries_experiment.py` — reference-free rubric judge
+  + deterministic length / must-mention checks, plus a groundedness **negative
+  control** (`checks.expect_unfaithful`: a summary of the *wrong* book must be
+  flagged unfaithful). Recommend + curation next, same pattern.

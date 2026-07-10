@@ -43,6 +43,11 @@ def build_items() -> list[dict]:
                     "must_mention": facts,
                     "checks": it.get("checks", {}),
                     "note": it.get("note"),
+                    # For the negative control, the book actually summarised differs
+                    # from `input` (the book the judge is told about). Positive items
+                    # summarise the same book they claim.
+                    "summarise_book": it.get("summarise_book", it["book"]),
+                    "summarise_author": it.get("summarise_author", it.get("author", "")),
                 },
             }
         )
@@ -51,8 +56,13 @@ def build_items() -> list[dict]:
 
 def make_task(api_key: str, user_id: str):
     def task(*, item, **kwargs):
-        author = (item.metadata or {}).get("author", "")
-        return summariser.get_summary(item.input, author, api_key, user_id)
+        meta = item.metadata or {}
+        # Summarise `summarise_book` (== the claimed book for positive items; a
+        # DIFFERENT book for the negative control), so the judge — told about
+        # item.input — can catch the mismatch.
+        book = meta.get("summarise_book") or item.input
+        author = meta.get("summarise_author", "")
+        return summariser.get_summary(book, author, api_key, user_id)
 
     return task
 
@@ -95,8 +105,29 @@ def summary_evaluator(*, input, output, expected_output=None, metadata=None, **k
             comment=f"{words} words (min {min_words})",
         ),
     ]
-    passed = length_ok and mentions_all and verdict.faithful and verdict.covers_three_chapters
-    evaluations.append(Evaluation(name="passed", value=bool(passed), data_type="BOOLEAN"))
+    # Negative control (expect_unfaithful): the summary is of a DIFFERENT book
+    # than item.input, so the item passes only if the judge flags it unfaithful.
+    # Guards against a rubber-stamp faithfulness judge.
+    negative_control = bool(checks.get("expect_unfaithful"))
+    if negative_control:
+        passed = not verdict.faithful
+    else:
+        passed = (
+            length_ok
+            and mentions_all
+            and verdict.faithful
+            and verdict.covers_three_chapters
+        )
+    evaluations.append(
+        Evaluation(
+            name="passed",
+            value=bool(passed),
+            data_type="BOOLEAN",
+            comment="negative control (judge must flag unfaithful)"
+            if negative_control
+            else None,
+        )
+    )
     return evaluations
 
 
