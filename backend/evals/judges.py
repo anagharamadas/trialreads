@@ -137,3 +137,67 @@ def judge_summary(book: str, author: str, summary: str) -> SummaryVerdict:
     return _summary_judge_chain().invoke(
         {"book": book, "author": author or "(unknown)", "summary": summary or "(empty)"}
     )
+
+
+# ── Recommendation judge (M3) ─────────────────────────────────────────────
+# Relevance is the point of a recommender, so this judge decides whether the
+# recommended books genuinely suit someone who liked the seed book (genre,
+# theme, appeal) — separate from the deterministic count/field checks.
+
+
+class RecommendVerdict(BaseModel):
+    """Judgement of a set of book recommendations against the seed book."""
+
+    relevant: bool = Field(
+        description="True if MOST recommendations genuinely suit a reader who "
+        "liked the seed book (similar genre / theme / appeal)."
+    )
+    score: float = Field(description="0.0-1.0 overall relevance of the set.")
+    rationale: str = Field(description="One sentence explaining the verdict.")
+
+
+_RECOMMEND_SYSTEM = (
+    "You evaluate a book recommender. You are given a SEED book (title + author) "
+    "and a list of RECOMMENDED books (title by author, with a reason). Judge "
+    "whether the recommendations genuinely suit a reader who liked the seed — "
+    "similar genre, theme, tone, or appeal.\n"
+    "- relevant: true if MOST recommendations are on-target for the seed.\n"
+    "- A set from a clearly unrelated genre (e.g. physics texts for a romance "
+    "novel) is NOT relevant.\n"
+    "- The seed book itself must not appear in the recommendations.\n"
+    "- score: overall 0.0-1.0."
+)
+
+_recommend_chain = None
+
+
+def _recommend_judge_chain():
+    global _recommend_chain
+    if _recommend_chain is None:
+        llm = ChatOpenAI(
+            model=config.JUDGE_MODEL,
+            temperature=0,
+            openai_api_key=config.openai_api_key(),
+        )
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", _RECOMMEND_SYSTEM),
+                (
+                    "human",
+                    "SEED: {book} by {author}\n\nRECOMMENDED:\n{recommendations}",
+                ),
+            ]
+        )
+        _recommend_chain = prompt | llm.with_structured_output(RecommendVerdict)
+    return _recommend_chain
+
+
+def judge_recommendations(book: str, author: str, recommendations: str) -> RecommendVerdict:
+    """Score a set of recommendations for relevance to the seed book."""
+    return _recommend_judge_chain().invoke(
+        {
+            "book": book,
+            "author": author or "(unknown)",
+            "recommendations": recommendations or "(none)",
+        }
+    )

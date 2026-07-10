@@ -87,7 +87,10 @@ evals/
 - **M1 (done):** scaffold + NL→SQL, offline.
 - **M2 (done):** Langfuse dataset experiment (`langfuse_experiment.py`) — reuses the
   M1 dataset + judge; records scores/traces to Langfuse.
-- **M3 (summariser done):** `summaries_experiment.py` — reference-free rubric judge
-  + deterministic length / must-mention checks, plus a groundedness **negative
-  control** (`checks.expect_unfaithful`: a summary of the *wrong* book must be
-  flagged unfaithful). Recommend + curation next, same pattern.
+- **M3 (summariser + recommender done):**
+  - `summaries_experiment.py` — rubric judge + length / must-mention checks, with a
+    groundedness **negative control** (`checks.expect_unfaithful`).
+  - `recommend_experiment.py` — relevance judge + structure checks (count / fields /
+    seed-excluded), with a relevance **negative control** (`checks.expect_irrelevant`:
+    recommendations generated for an unrelated-genre book must be flagged irrelevant).
+  - Curation next, same pattern.
