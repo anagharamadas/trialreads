@@ -36,6 +36,7 @@ class Result:
     rationale: str = ""
     checks: dict = field(default_factory=dict)  # check name -> passed bool
     error: str = ""
+    negative_control: bool = False  # item passes when the judge REJECTS the answer
 
 
 # Collected results for the report. record_result() is the seam where M2 will
@@ -77,17 +78,28 @@ def run_item(item: dict, user_id: str, api_key: str) -> Result:
         result.checks["sql_generated"] = bool(result.sql)
 
     # ── LLM-as-judge correctness ─────────────────────────────────────────
+    judge_ran = False
+    judged_correct = False
     try:
         verdict = judges.judge_answer(result.question, result.expected, result.actual)
         result.score = verdict.score
         result.rationale = verdict.rationale
         judged_correct = verdict.correct
+        judge_ran = True
     except Exception as exc:
         result.error = f"judge raised: {exc.__class__.__name__}: {exc}"
-        judged_correct = False
 
-    # An item passes only if every structural check passed AND the judge agrees.
-    result.passed = all(result.checks.values()) and judged_correct
+    # Negative control (expect_incorrect): `expected` is a deliberately WRONG
+    # answer, and the item passes only if the judge actually ran and flagged the
+    # (correct) actual answer as NOT matching it — i.e. the judge isn't a
+    # rubber stamp. A judge crash must never masquerade as a passing control,
+    # hence the explicit judge_ran gate on both paths.
+    result.negative_control = bool(checks.get("expect_incorrect"))
+    structural_ok = all(result.checks.values())
+    if result.negative_control:
+        result.passed = structural_ok and judge_ran and not judged_correct
+    else:
+        result.passed = structural_ok and judge_ran and judged_correct
     return result
 
 
@@ -95,25 +107,33 @@ def write_report(user_id: str, dataset_name: str) -> None:
     total = len(_results)
     passed = sum(r.passed for r in _results)
     rate = passed / total if total else 0.0
-    avg_score = sum(r.score for r in _results) / total if total else 0.0
+    # Avg judge score reflects answer quality on POSITIVE items only. Negative
+    # controls score ~0 by design (a correct rejection), so averaging them in
+    # would understate quality.
+    positives = [r for r in _results if not r.negative_control]
+    n_controls = total - len(positives)
+    avg_score = sum(r.score for r in positives) / len(positives) if positives else 0.0
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
 
     lines = [
         "# NL->SQL eval report",
         "",
         f"- **Run:** {stamp}",
-        f"- **Dataset:** `{dataset_name}` ({total} items)",
+        f"- **Dataset:** `{dataset_name}` ({total} items, "
+        f"{len(positives)} positive + {n_controls} negative-control)",
         f"- **Judge model:** `{config.JUDGE_MODEL}`",
         f"- **Fixture user:** `{user_id}`",
         f"- **Pass rate:** {passed}/{total} = **{rate:.0%}** "
         f"(threshold {config.PASS_THRESHOLD:.0%})",
-        f"- **Avg judge score:** {avg_score:.2f}",
+        f"- **Avg judge score (positives):** {avg_score:.2f}",
         "",
         "| id | result | score | question | expected | actual | note |",
         "|----|--------|-------|----------|----------|--------|------|",
     ]
     for r in _results:
         note = r.error or r.rationale
+        if r.negative_control:
+            note = f"[neg-control] {note}"
         actual = (r.actual or "").replace("\n", " ")
         if len(actual) > 80:
             actual = actual[:77] + "..."

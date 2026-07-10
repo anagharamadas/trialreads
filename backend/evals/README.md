@@ -13,6 +13,12 @@ check + an LLM-as-judge, writing a Markdown report. Only OpenAI + Supabase
   against `"6"`, so a strict judge (`judges.py`) decides semantic correctness.
 - **Structural vs semantic checks:** `sql_required` (deterministic) and the judge
   verdict must *both* pass for an item to pass.
+- **Adversarial coverage:** the set includes multi-filter, empty-result, colloquial
+  phrasing, and superlative cases so the score is a real signal, not just happy-path.
+- **Negative control (`checks.expect_incorrect: true`):** the item's `expected` is
+  a deliberately WRONG answer; it passes only if the judge *rejects* it. This
+  guards against a rubber-stamp judge — if it ever starts passing, the judge is
+  broken, not the feature.
 
 ## One-time setup
 1. **Create a throwaway eval account.** Sign up a test user in the app, then copy

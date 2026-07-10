@@ -8,3 +8,10 @@
 {"id": "nlsql-08", "question": "Who wrote Sapiens?", "expected": "Yuval Noah Harari", "checks": {"sql_required": true}}
 {"id": "nlsql-09", "question": "What is the most recent year in which I finished a book?", "expected": "2024", "checks": {"sql_required": true}}
 {"id": "nlsql-10", "question": "Do I have any books by Frank Herbert, and what is its status?", "expected": "Yes, Dune, which is on the 'Yet to Buy' list", "checks": {"sql_required": true}}
+{"id": "nlsql-11", "question": "How many books have I finished before 2024?", "expected": "4", "checks": {"sql_required": true}, "note": "multi-filter: status = Finished AND year < 2024 (three 2023 + one 2022)"}
+{"id": "nlsql-12", "question": "How many books did I finish in 2025?", "expected": "0 (none)", "checks": {"sql_required": true}, "note": "empty-result count — must answer zero, not hallucinate a book"}
+{"id": "nlsql-13", "question": "Do I have any books by Stephen King?", "expected": "No, you have no books by Stephen King", "checks": {"sql_required": true}, "note": "empty-result existence — no matching rows"}
+{"id": "nlsql-14", "question": "List the authors of the books I am currently reading.", "expected": "Martin Fowler and Eric Evans", "checks": {"sql_required": true}, "note": "filter on status = Reading + project the author column"}
+{"id": "nlsql-15", "question": "How many books are still on my to-buy pile?", "expected": "2", "checks": {"sql_required": true}, "note": "colloquial phrasing must map to status = 'Yet to Buy'"}
+{"id": "nlsql-16", "question": "What is the earliest year in which I finished a book?", "expected": "2022", "checks": {"sql_required": true}, "note": "superlative/aggregation (MIN year) — mirror of nlsql-09"}
+{"id": "nlsql-17", "question": "How many books have I finished?", "expected": "You have finished 99 books.", "checks": {"sql_required": true, "expect_incorrect": true}, "note": "NEGATIVE CONTROL: expected is deliberately wrong (true answer is 6). Passes only if the judge REJECTS it — proves the judge isn't a rubber stamp."}
