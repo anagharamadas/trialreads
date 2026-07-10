@@ -43,12 +43,31 @@ python -m evals.run_eval
 Prints per-item PASS/FAIL, writes `evals/reports/nl_sql.md`, and exits non-zero
 if the pass rate is below `EVAL_PASS_THRESHOLD` (default 0.8) — CI-gate ready.
 
+## Run with Langfuse (M2)
+Same golden set + judge, but pushed to a Langfuse **dataset** and run as an
+**experiment** so scores/traces land in the Langfuse UI for run-over-run comparison:
+```
+cd backend
+python -m evals.langfuse_experiment
+```
+Needs `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` (+ `EVAL_USER_ID` and a seeded
+fixture). Upserts the dataset `nl-sql-golden` (idempotent by item id), records
+`correctness` / `sql_generated` / `passed` scores per item, and prints the
+dataset-run URL. `correctness` is averaged over *all* items in the Langfuse UI,
+so the negative control's 0.0 pulls it below 1.0 by design — read `passed` as the
+headline.
+
+> **SDK note:** the installed SDK is `langfuse==3.0.1`; this runner uses the v3
+> `dataset.run_experiment()` API. `requirements.txt` still pins `4.13.0` (drift —
+> see project notes); align them before relying on a fresh install.
+
 ## Config (all optional, from `.env` / env)
 | Var | Default | Meaning |
 |-----|---------|---------|
 | `EVAL_USER_ID` | — (required) | Fixture user's auth UUID |
 | `EVAL_JUDGE_MODEL` | `gpt-4o-mini` | Judge model |
-| `EVAL_PASS_THRESHOLD` | `0.8` | Min pass rate for exit 0 |
+| `EVAL_PASS_THRESHOLD` | `0.8` | Min pass rate for exit 0 (offline runner) |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | — | Enable the M2 experiment runner |
 
 ## Layout
 ```
@@ -57,13 +76,14 @@ evals/
   datasets/nl_sql.jsonl           # question → expected answer (matches fixture)
   seed_fixture.py                 # idempotent seed into EVAL_USER_ID's library
   judges.py                       # LLM-as-judge (Verdict: correct/score/rationale)
-  run_eval.py                     # runner → reports/nl_sql.md
+  run_eval.py                     # M1 offline runner → reports/nl_sql.md
+  langfuse_experiment.py          # M2 Langfuse dataset experiment (reuses the above)
   reports/                        # generated
 ```
 
 ## Roadmap
 - **M1 (done):** scaffold + NL→SQL, offline.
-- **M2:** Langfuse datasets + score recording — hooks into `run_eval.record_result()`,
-  the one seam built for it. Needs `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`.
+- **M2 (done):** Langfuse dataset experiment (`langfuse_experiment.py`) — reuses the
+  M1 dataset + judge; records scores/traces to Langfuse.
 - **M3:** add summaries, recommend, curation — one feature per checkpoint, reusing
   this harness.
