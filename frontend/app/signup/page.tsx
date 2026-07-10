@@ -18,7 +18,16 @@ export default function SignupPage() {
     setBusy(true);
     setError(null);
     setNotice(null);
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    // emailRedirectTo pins the confirmation link back to THIS origin's
+    // /auth/callback (localhost in dev, the Vercel domain in prod) instead of
+    // falling back to the project's Site URL — which is what made the link land
+    // on an unreachable address. The URL must be in Supabase's Redirect URLs
+    // allow-list or Supabase ignores it and reverts to the Site URL.
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
     setBusy(false);
     if (error) {
       setError(error.message);
