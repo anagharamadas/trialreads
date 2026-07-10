@@ -1,0 +1,17 @@
+{
+  "_comment": "Canonical eval fixture for the NL->SQL feature. seed_fixture.py loads these rows into EVAL_USER_ID's library so every golden answer in datasets/nl_sql.jsonl is deterministic. Change a row here and you MUST update the affected expected answers in the dataset (and re-seed).",
+  "books": [
+    { "book": "The Pragmatic Programmer", "author": "Andrew Hunt", "status": "Finished", "year": 2023 },
+    { "book": "Clean Code", "author": "Robert C. Martin", "status": "Finished", "year": 2023 },
+    { "book": "Sapiens", "author": "Yuval Noah Harari", "status": "Finished", "year": 2023 },
+    { "book": "Designing Data-Intensive Applications", "author": "Martin Kleppmann", "status": "Finished", "year": 2024 },
+    { "book": "The Left Hand of Darkness", "author": "Ursula K. Le Guin", "status": "Finished", "year": 2024 },
+    { "book": "The Mythical Man-Month", "author": "Fred Brooks", "status": "Finished", "year": 2022 },
+    { "book": "Refactoring", "author": "Martin Fowler", "status": "Reading", "year": null },
+    { "book": "Domain-Driven Design", "author": "Eric Evans", "status": "Reading", "year": null },
+    { "book": "The Phoenix Project", "author": "Gene Kim", "status": "Ready to Start", "year": null },
+    { "book": "Accelerate", "author": "Nicole Forsgren", "status": "Ready to Start", "year": null },
+    { "book": "Dune", "author": "Frank Herbert", "status": "Yet to Buy", "year": null },
+    { "book": "Project Hail Mary", "author": "Andy Weir", "status": "Yet to Buy", "year": null }
+  ]
+}

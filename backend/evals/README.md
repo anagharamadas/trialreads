@@ -1,0 +1,93 @@
+# TrialReads eval harness (Phase 4)
+
+Offline evaluation of the AI features. **M1 is Langfuse-free** — it runs golden
+datasets over a fixed fixture library and scores answers with a deterministic
+check + an LLM-as-judge, writing a Markdown report. Only OpenAI + Supabase
+(already in `backend/.env`) are needed. M2 layers Langfuse on top.
+
+## What you'll learn (M1)
+- **Golden-dataset design:** answers are deterministic only because the fixture
+  (`fixtures/library_fixture.json`) and the dataset (`datasets/nl_sql.jsonl`)
+  are kept in lockstep. Change one → update the other.
+- **LLM-as-judge:** an NL answer ("You've finished 6 books.") can't be string-matched
+  against `"6"`, so a strict judge (`judges.py`) decides semantic correctness.
+- **Structural vs semantic checks:** `sql_required` (deterministic) and the judge
+  verdict must *both* pass for an item to pass.
+- **Adversarial coverage:** the set includes multi-filter, empty-result, colloquial
+  phrasing, and superlative cases so the score is a real signal, not just happy-path.
+- **Negative control (`checks.expect_incorrect: true`):** the item's `expected` is
+  a deliberately WRONG answer; it passes only if the judge *rejects* it. This
+  guards against a rubber-stamp judge — if it ever starts passing, the judge is
+  broken, not the feature.
+
+## One-time setup
+1. **Create a throwaway eval account.** Sign up a test user in the app, then copy
+   its UUID from the Supabase dashboard → Authentication → Users.
+2. **Add it to `backend/.env`:**
+   ```
+   EVAL_USER_ID=<that-uuid>
+   ```
+   (The FK `library.user_id → auth.users(id)` means the fixture user must be a
+   real auth user. Use a throwaway — seeding **wipes** its library.)
+3. **Seed the fixture:**
+   ```
+   cd backend
+   python -m evals.seed_fixture          # add --force if the user already has rows
+   ```
+
+## Run
+```
+cd backend
+python -m evals.run_eval
+```
+Prints per-item PASS/FAIL, writes `evals/reports/nl_sql.md`, and exits non-zero
+if the pass rate is below `EVAL_PASS_THRESHOLD` (default 0.8) — CI-gate ready.
+
+## Run with Langfuse (M2)
+Same golden set + judge, but pushed to a Langfuse **dataset** and run as an
+**experiment** so scores/traces land in the Langfuse UI for run-over-run comparison:
+```
+cd backend
+python -m evals.langfuse_experiment
+```
+Needs `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` (+ `EVAL_USER_ID` and a seeded
+fixture). Upserts the dataset `nl-sql-golden` (idempotent by item id), records
+`correctness` / `sql_generated` / `passed` scores per item, and prints the
+dataset-run URL. `correctness` is averaged over *all* items in the Langfuse UI,
+so the negative control's 0.0 pulls it below 1.0 by design — read `passed` as the
+headline.
+
+> **SDK note:** uses the `dataset.run_experiment()` API, which is present with an
+> identical `Evaluation` signature on both `langfuse` 3.x and 4.x. The venv and
+> `requirements.txt` agree on `4.13.0`. Watch out for an Anaconda base install of
+> `langfuse` (3.0.1) leaking onto `PYTHONPATH` and shadowing the venv — run with
+> the venv active and no `conda` base env to be safe.
+
+## Config (all optional, from `.env` / env)
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `EVAL_USER_ID` | — (required) | Fixture user's auth UUID |
+| `EVAL_JUDGE_MODEL` | `gpt-4o-mini` | Judge model |
+| `EVAL_PASS_THRESHOLD` | `0.8` | Min pass rate for exit 0 (offline runner) |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | — | Enable the M2 experiment runner |
+
+## Layout
+```
+evals/
+  fixtures/library_fixture.json   # canonical library rows
+  datasets/nl_sql.jsonl           # question → expected answer (matches fixture)
+  seed_fixture.py                 # idempotent seed into EVAL_USER_ID's library
+  judges.py                       # LLM-as-judge (Verdict: correct/score/rationale)
+  run_eval.py                     # M1 offline runner → reports/nl_sql.md
+  langfuse_experiment.py          # M2 Langfuse dataset experiment (reuses the above)
+  reports/                        # generated
+```
+
+## Roadmap
+- **M1 (done):** scaffold + NL→SQL, offline.
+- **M2 (done):** Langfuse dataset experiment (`langfuse_experiment.py`) — reuses the
+  M1 dataset + judge; records scores/traces to Langfuse.
+- **M3 (summariser done):** `summaries_experiment.py` — reference-free rubric judge
+  + deterministic length / must-mention checks, plus a groundedness **negative
+  control** (`checks.expect_unfaithful`: a summary of the *wrong* book must be
+  flagged unfaithful). Recommend + curation next, same pattern.
