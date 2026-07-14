@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Modal } from "@/components/Modal";
 import { api, type ShelfBook } from "@/lib/api";
 
 /** A book on a shelf detail page: cover/placeholder with an order badge,
  *  the agent's reason on hover, up/down reorder, remove, and (when not yet in
- *  the library) an Add-to-library action. */
+ *  the library) Add-to-library and Summarise actions — the summary is a
+ *  try-before-you-commit preview for books you're still considering. */
 export function ShelfBookCard({
   book,
   index,
@@ -22,6 +24,9 @@ export function ShelfBookCard({
   onAddToLibrary: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState<null | "up" | "down" | "remove" | "add">(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarising, setSummarising] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
 
   async function run(kind: "up" | "down" | "remove" | "add", fn: () => Promise<void> | void) {
     setBusy(kind);
@@ -29,6 +34,20 @@ export function ShelfBookCard({
       await fn();
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function summarise() {
+    setShowSummary(true);
+    if (summary || summarising) return; // already fetched (or fetching) — just reopen
+    setSummarising(true);
+    try {
+      const res = await api.summarise(book.title, book.author ?? "");
+      setSummary(res.summary);
+    } catch (e) {
+      setSummary(`Error: ${String(e)}`);
+    } finally {
+      setSummarising(false);
     }
   }
 
@@ -102,16 +121,53 @@ export function ShelfBookCard({
       </div>
 
       {book.library_book_id == null && (
-        <button
-          onClick={() => run("add", onAddToLibrary)}
-          disabled={busy !== null}
-          className="mt-1.5 w-full rounded border border-accent/40 px-2 py-1 text-xs text-accent hover:bg-accent/5 disabled:opacity-40"
-        >
-          {busy === "add" ? "Adding…" : "+ Add to library"}
-        </button>
+        <>
+          <button
+            onClick={() => run("add", onAddToLibrary)}
+            disabled={busy !== null}
+            className="mt-1.5 w-full rounded border border-accent/40 px-2 py-1 text-xs text-accent hover:bg-accent/5 disabled:opacity-40"
+          >
+            {busy === "add" ? "Adding…" : "+ Add to library"}
+          </button>
+          <button
+            onClick={summarise}
+            disabled={busy !== null}
+            className="mt-1.5 w-full rounded border border-cream-300 px-2 py-1 text-xs text-ink-soft hover:bg-cream-200 disabled:opacity-40"
+          >
+            {summarising ? "Summarising…" : "Preview summary"}
+          </button>
+        </>
       )}
       {book.library_book_id != null && (
         <p className="mt-1.5 text-xs text-emerald-700">✓ In your library</p>
+      )}
+
+      {showSummary && (
+        <Modal onClose={() => setShowSummary(false)}>
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-xl text-ink">{book.title}</h2>
+              {book.author && <p className="text-sm text-ink-soft">{book.author}</p>}
+              <p className="mt-1 text-xs text-ink-soft">
+                Summary of the first 3 chapters — a preview to help you decide.
+              </p>
+            </div>
+            {summarising && <p className="text-sm text-ink-soft">Summarising…</p>}
+            {summary && (
+              <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap rounded-md bg-white/60 p-4 text-sm leading-relaxed text-ink">
+                {summary}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowSummary(false)}
+                className="rounded-md border border-cream-300 px-4 py-2 text-sm text-ink hover:bg-cream-200"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
