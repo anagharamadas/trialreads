@@ -36,6 +36,11 @@ export type ShelfBook = {
   reason: string | null;
   reading_order: number | null;
   added_by: "user" | "agent";
+  // Google Books aggregate rating captured at add time (null = none known).
+  // Written reviews live on the info_link page — the API has no review text.
+  average_rating: number | null;
+  ratings_count: number | null;
+  info_link: string | null;
 };
 
 export type ShelfBookInput = {
@@ -45,6 +50,9 @@ export type ShelfBookInput = {
   reason?: string | null;
   reading_order?: number | null;
   library_book_id?: number | null;
+  average_rating?: number | null;
+  ratings_count?: number | null;
+  info_link?: string | null;
 };
 
 export type CurateProposalItem = {
@@ -53,6 +61,9 @@ export type CurateProposalItem = {
   cover_url: string | null;
   reason: string;
   reading_order: number;
+  average_rating: number | null;
+  ratings_count: number | null;
+  info_link: string | null;
 };
 
 export type CurateProposal = {
@@ -105,9 +116,14 @@ export const api = {
   deleteBook: (id: number) =>
     request<void>(`/library/${id}`, { method: "DELETE" }),
 
-  // Covers (Google Books via backend)
+  // Covers + rating (Google Books via backend, one call)
   getCover: (title: string, author = "") =>
-    request<{ cover_url: string | null }>(
+    request<{
+      cover_url: string | null;
+      average_rating: number | null;
+      ratings_count: number | null;
+      info_link: string | null;
+    }>(
       `/covers?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`
     ),
 

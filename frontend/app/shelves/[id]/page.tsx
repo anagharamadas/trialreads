@@ -215,18 +215,28 @@ function AddBookModal({
     setBusy(true);
     setError(null);
     try {
-      // fetch a cover the same way the Library add-book flow does
+      // fetch cover + Google Books rating in one call (both best-effort)
       let cover_url: string | null = null;
+      let average_rating: number | null = null;
+      let ratings_count: number | null = null;
+      let info_link: string | null = null;
       try {
-        cover_url = (await api.getCover(title.trim(), author.trim())).cover_url;
+        const gb = await api.getCover(title.trim(), author.trim());
+        cover_url = gb.cover_url;
+        average_rating = gb.average_rating;
+        ratings_count = gb.ratings_count;
+        info_link = gb.info_link;
       } catch {
-        /* cover is best-effort */
+        /* metadata is best-effort */
       }
       await api.shelves.addBook(shelfId, {
         title: title.trim(),
         author: author.trim() || null,
         cover_url,
         reading_order: nextOrder,
+        average_rating,
+        ratings_count,
+        info_link,
       });
       onAdded();
     } catch (err) {

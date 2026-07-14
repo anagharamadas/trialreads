@@ -93,6 +93,26 @@ export function ShelfBookCard({
       {book.author && (
         <p className="line-clamp-1 text-xs text-ink-soft">{book.author}</p>
       )}
+      {book.average_rating != null && (
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
+          <span aria-hidden>★</span>
+          <span>
+            {book.average_rating.toFixed(1)}
+            {book.ratings_count != null && ` · ${book.ratings_count.toLocaleString()} ratings`}
+          </span>
+          {book.info_link && (
+            <a
+              href={book.info_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:underline"
+              title="Read reviews on Google Books"
+            >
+              reviews ↗
+            </a>
+          )}
+        </p>
+      )}
 
       <div className="mt-1.5 flex items-center gap-1 text-xs">
         <button

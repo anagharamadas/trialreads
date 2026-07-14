@@ -99,6 +99,9 @@ class ShelfBookCreate(BaseModel):
     reading_order: Optional[int] = None
     library_book_id: Optional[int] = None
     added_by: ShelfBookSource = "user"
+    average_rating: Optional[float] = Field(default=None, ge=0, le=5)
+    ratings_count: Optional[int] = Field(default=None, ge=0)
+    info_link: Optional[str] = None
 
 
 class ShelfBookBulkItem(BaseModel):
@@ -108,6 +111,9 @@ class ShelfBookBulkItem(BaseModel):
     reason: Optional[str] = None
     reading_order: Optional[int] = None
     library_book_id: Optional[int] = None
+    average_rating: Optional[float] = Field(default=None, ge=0, le=5)
+    ratings_count: Optional[int] = Field(default=None, ge=0)
+    info_link: Optional[str] = None
 
 
 class ShelfBookBulkCreate(BaseModel):
@@ -134,6 +140,9 @@ class ShelfBook(BaseModel):
     reason: Optional[str] = None
     reading_order: Optional[int] = None
     added_by: ShelfBookSource
+    average_rating: Optional[float] = None
+    ratings_count: Optional[int] = None
+    info_link: Optional[str] = None
 
 
 # ── Curation agent (Phase 2, M5) ──
@@ -152,6 +161,11 @@ class CurateItem(BaseModel):
     cover_url: Optional[str] = None
     reason: str = ""
     reading_order: int
+    # Google Books aggregate rating (no review text via the API; written
+    # reviews are on the info_link page). None when Google has no rating.
+    average_rating: Optional[float] = Field(default=None, ge=0, le=5)
+    ratings_count: Optional[int] = Field(default=None, ge=0)
+    info_link: Optional[str] = None
 
 
 class CurateProposal(BaseModel):

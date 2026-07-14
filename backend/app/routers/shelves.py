@@ -41,7 +41,8 @@ settings = get_settings()
 _SHELF_COLS = "id::text AS id, name, description, created_at::text AS created_at"
 _BOOK_COLS = (
     "id::text AS id, shelf_id::text AS shelf_id, library_book_id, title, author, "
-    "cover_url, reason, reading_order, added_by"
+    "cover_url, reason, reading_order, added_by, "
+    "average_rating, ratings_count, info_link"
 )
 
 
@@ -166,9 +167,11 @@ def add_shelf_book(
             text(
                 "INSERT INTO public.shelf_books "
                 "(shelf_id, user_id, library_book_id, title, author, cover_url, "
-                " reason, reading_order, added_by) "
+                " reason, reading_order, added_by, "
+                " average_rating, ratings_count, info_link) "
                 "VALUES (:s, :me, :library_book_id, :title, :author, :cover_url, "
-                " :reason, :reading_order, :added_by) "
+                " :reason, :reading_order, :added_by, "
+                " :average_rating, :ratings_count, :info_link) "
                 "ON CONFLICT (shelf_id, title, author) DO NOTHING "
                 f"RETURNING {_BOOK_COLS}"
             ),
@@ -201,9 +204,11 @@ def bulk_add_shelf_books(
                 text(
                     "INSERT INTO public.shelf_books "
                     "(shelf_id, user_id, library_book_id, title, author, cover_url, "
-                    " reason, reading_order, added_by) "
+                    " reason, reading_order, added_by, "
+                    " average_rating, ratings_count, info_link) "
                     "VALUES (:s, :me, :library_book_id, :title, :author, "
-                    " :cover_url, :reason, :reading_order, :added_by) "
+                    " :cover_url, :reason, :reading_order, :added_by, "
+                    " :average_rating, :ratings_count, :info_link) "
                     "ON CONFLICT (shelf_id, title, author) DO NOTHING "
                     f"RETURNING {_BOOK_COLS}"
                 ),

@@ -131,6 +131,11 @@ def _ground(overview: str, items: list[_ExtractedItem]) -> dict | None:
                 "cover_url": gb.get("cover_url") or None,
                 "reason": (it.reason or "").strip(),
                 "reading_order": 0,
+                # Ratings ride along from the SAME validation response — the
+                # proposal card shows them so the user can judge before accepting.
+                "average_rating": gb.get("average_rating"),
+                "ratings_count": gb.get("ratings_count"),
+                "info_link": gb.get("info_link") or None,
             }
         )
     if not grounded:

@@ -34,12 +34,20 @@ def get_cover(
         r = httpx.get(GOOGLE_BOOKS, params=params, timeout=10)
         items = r.json().get("items", [])
         if items:
-            links = items[0].get("volumeInfo", {}).get("imageLinks", {})
+            vi = items[0].get("volumeInfo", {})
+            links = vi.get("imageLinks", {})
             url = links.get("thumbnail") or links.get("smallThumbnail")
             if url:
                 # force https + drop the page-curl edge for a cleaner cover
                 url = url.replace("http://", "https://").replace("&edge=curl", "")
-                return {"cover_url": url}
+            # Aggregate rating rides along from the same response so manual
+            # shelf adds get review data without a second API call.
+            return {
+                "cover_url": url,
+                "average_rating": vi.get("averageRating"),
+                "ratings_count": vi.get("ratingsCount"),
+                "info_link": vi.get("infoLink"),
+            }
     except Exception:
         pass
-    return {"cover_url": None}
+    return {"cover_url": None, "average_rating": None, "ratings_count": None, "info_link": None}

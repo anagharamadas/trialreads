@@ -69,6 +69,9 @@ export function CurationChat({
         cover_url: it.cover_url,
         reason: it.reason || null,
         reading_order: idx + 1, // renumber over the selected subset
+        average_rating: it.average_rating ?? null,
+        ratings_count: it.ratings_count ?? null,
+        info_link: it.info_link ?? null,
       }));
     if (items.length === 0) return;
     setBusy(true);
@@ -180,6 +183,27 @@ export function CurationChat({
                       </p>
                       {it.author && (
                         <p className="text-xs text-ink-soft">{it.author}</p>
+                      )}
+                      {it.average_rating != null && (
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
+                          <span aria-hidden>★</span>
+                          <span>
+                            {it.average_rating.toFixed(1)}
+                            {it.ratings_count != null &&
+                              ` · ${it.ratings_count.toLocaleString()} ratings`}
+                          </span>
+                          {it.info_link && (
+                            <a
+                              href={it.info_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-accent hover:underline"
+                              title="Read reviews on Google Books"
+                            >
+                              reviews ↗
+                            </a>
+                          )}
+                        </p>
                       )}
                       {it.reason && (
                         <p className="mt-0.5 line-clamp-2 text-xs italic text-ink-soft">

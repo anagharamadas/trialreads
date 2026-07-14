@@ -38,6 +38,11 @@ def search(query: str, max_results: int = 5, api_key: str = "") -> list[dict]:
                 "cover_url": _clean_cover(
                     links.get("thumbnail") or links.get("smallThumbnail") or ""
                 ),
+                # Aggregate Google Books rating (the API exposes no review text;
+                # written reviews live on the info_link page). Often absent.
+                "average_rating": vi.get("averageRating"),
+                "ratings_count": vi.get("ratingsCount"),
+                "info_link": vi.get("infoLink") or "",
             }
         )
     return out
