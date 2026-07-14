@@ -184,14 +184,18 @@ export function CurationChat({
                       {it.author && (
                         <p className="text-xs text-ink-soft">{it.author}</p>
                       )}
-                      {it.average_rating != null && (
+                      {(it.average_rating != null || it.info_link) && (
                         <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
-                          <span aria-hidden>★</span>
-                          <span>
-                            {it.average_rating.toFixed(1)}
-                            {it.ratings_count != null &&
-                              ` · ${it.ratings_count.toLocaleString()} ratings`}
-                          </span>
+                          {it.average_rating != null && (
+                            <>
+                              <span aria-hidden>★</span>
+                              <span>
+                                {it.average_rating.toFixed(1)}
+                                {it.ratings_count != null &&
+                                  ` · ${it.ratings_count.toLocaleString()} ratings`}
+                              </span>
+                            </>
+                          )}
                           {it.info_link && (
                             <a
                               href={it.info_link}

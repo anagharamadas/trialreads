@@ -49,9 +49,26 @@ def search(query: str, max_results: int = 5, api_key: str = "") -> list[dict]:
 
 
 def validate(title: str, author: str = "", api_key: str = "") -> dict | None:
-    """Confirm a specific book exists; returns the canonical record or None."""
+    """Confirm a specific book exists; returns the canonical record or None.
+
+    Fetches the top 5 editions (one API call): canonical data comes from the
+    best match, but ratings are borrowed from the first RATED edition when the
+    best match has none — Google's ratings live on specific editions, and the
+    top hit is often an unrated reprint of a well-rated book.
+    """
     q = f"intitle:{title}"
     if author:
         q += f" inauthor:{author}"
-    res = search(q, 1, api_key)
-    return res[0] if res else None
+    res = search(q, 5, api_key)
+    if not res:
+        return None
+    best = res[0]
+    if best.get("average_rating") is None:
+        rated = next((r for r in res if r.get("average_rating") is not None), None)
+        if rated:
+            best = {
+                **best,
+                "average_rating": rated["average_rating"],
+                "ratings_count": rated.get("ratings_count"),
+            }
+    return best

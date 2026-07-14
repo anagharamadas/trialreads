@@ -49,7 +49,7 @@ def lookup(title: str, author: str, api_key: str) -> dict | None:
     q = f"intitle:{title}"
     if author:
         q += f" inauthor:{author}"
-    params: dict = {"q": q, "maxResults": 1, "printType": "books"}
+    params: dict = {"q": q, "maxResults": 5, "printType": "books"}
     if api_key:
         params["key"] = api_key
     try:
@@ -63,11 +63,15 @@ def lookup(title: str, author: str, api_key: str) -> dict | None:
     items = r.json().get("items", [])
     if not items:
         return None
-    vi = items[0].get("volumeInfo", {})
+    # Same edition-merge as services.google_books.validate: link/identity from
+    # the best match, rating borrowed from the first RATED edition.
+    infos = [it.get("volumeInfo", {}) for it in items]
+    best = infos[0]
+    rated = next((vi for vi in infos if vi.get("averageRating") is not None), None)
     return {
-        "average_rating": vi.get("averageRating"),
-        "ratings_count": vi.get("ratingsCount"),
-        "info_link": vi.get("infoLink"),
+        "average_rating": (rated or best).get("averageRating"),
+        "ratings_count": (rated or best).get("ratingsCount"),
+        "info_link": best.get("infoLink"),
     }
 
 

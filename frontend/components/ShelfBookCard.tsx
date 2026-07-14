@@ -93,13 +93,18 @@ export function ShelfBookCard({
       {book.author && (
         <p className="line-clamp-1 text-xs text-ink-soft">{book.author}</p>
       )}
-      {book.average_rating != null && (
+      {(book.average_rating != null || book.info_link) && (
         <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
-          <span aria-hidden>★</span>
-          <span>
-            {book.average_rating.toFixed(1)}
-            {book.ratings_count != null && ` · ${book.ratings_count.toLocaleString()} ratings`}
-          </span>
+          {book.average_rating != null && (
+            <>
+              <span aria-hidden>★</span>
+              <span>
+                {book.average_rating.toFixed(1)}
+                {book.ratings_count != null &&
+                  ` · ${book.ratings_count.toLocaleString()} ratings`}
+              </span>
+            </>
+          )}
           {book.info_link && (
             <a
               href={book.info_link}
