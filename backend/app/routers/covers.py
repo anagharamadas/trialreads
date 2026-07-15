@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query
 
 from ..auth import get_current_user_id
 from ..config import get_settings
+from ..services import hardcover
 
 router = APIRouter(tags=["covers"])
 settings = get_settings()
@@ -30,6 +31,7 @@ def get_cover(
     if settings.google_books_api_key:
         params["key"] = settings.google_books_api_key
 
+    out: dict = {"cover_url": None, "average_rating": None, "ratings_count": None, "info_link": None}
     try:
         r = httpx.get(GOOGLE_BOOKS, params=params, timeout=10)
         items = r.json().get("items", [])
@@ -40,14 +42,16 @@ def get_cover(
             if url:
                 # force https + drop the page-curl edge for a cleaner cover
                 url = url.replace("http://", "https://").replace("&edge=curl", "")
-            # Aggregate rating rides along from the same response so manual
-            # shelf adds get review data without a second API call.
-            return {
-                "cover_url": url,
-                "average_rating": vi.get("averageRating"),
-                "ratings_count": vi.get("ratingsCount"),
-                "info_link": vi.get("infoLink"),
-            }
+            out.update(
+                cover_url=url,
+                average_rating=vi.get("averageRating"),
+                ratings_count=vi.get("ratingsCount"),
+                info_link=vi.get("infoLink"),
+            )
     except Exception:
         pass
-    return {"cover_url": None, "average_rating": None, "ratings_count": None, "info_link": None}
+    # Hardcover is the preferred rating source; Google's (if any) is fallback.
+    hc = hardcover.get_rating(title, author)
+    if hc:
+        out.update(hc)
+    return out

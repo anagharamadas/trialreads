@@ -1,19 +1,18 @@
-"""One-off backfill: Google Books ratings for shelf books added before the
-ratings feature (average_rating / ratings_count / info_link columns).
+"""Backfill ratings for shelf books (Hardcover primary, Google Books fallback).
 
     cd backend
     python -m scripts.backfill_shelf_ratings --dry-run   # look, don't touch
-    python -m scripts.backfill_shelf_ratings             # backfill
+    python -m scripts.backfill_shelf_ratings             # rows without a rating
     python -m scripts.backfill_shelf_ratings --all       # re-lookup every row
 
 Behaviour:
-- Targets rows WHERE info_link IS NULL (the "never looked up" marker — a row
-  Google knows but has no rating for still gets its info_link set, so it won't
-  be retried on every run). --all re-looks-up everything.
-- Talks to Google Books directly (not via services.google_books) so it can SEE
-  HTTP status codes: on 429 it aborts immediately with a clear message instead
-  of writing empty results — run it again after the daily quota resets.
-- Paces requests (--sleep, default 1.0s) to stay under the burst rate limit.
+- Rating source #1: Hardcover GraphQL (services.hardcover; needs
+  HARDCOVER_API_KEY, 60 req/min — hence --sleep, default 1.0s).
+- Fallback: Google Books, which also supplies info_link when missing. Talks to
+  GB directly (not via services.google_books) so it can SEE status codes: 429/
+  403 aborts the run cleanly (daily quota), 5xx skips the row for the next run.
+- Default target: rows WHERE average_rating IS NULL. --all re-rates everything
+  (use after switching rating sources).
 - Uses the privileged DATABASE_URL engine (single-owner maintenance script,
   same pattern as scripts/import_existing_library.py); RLS does not apply.
 """
@@ -26,6 +25,7 @@ import httpx
 from sqlalchemy import create_engine, text
 
 from app.config import get_settings
+from app.services import hardcover
 
 GB = "https://www.googleapis.com/books/v1/volumes"
 
@@ -84,38 +84,59 @@ def main() -> int:
 
     settings = get_settings()
     engine = create_engine(settings.database_url)
+    if not hardcover.enabled():
+        print("NOTE: HARDCOVER_API_KEY not set — falling back to Google Books only.")
 
-    where = "" if args.all else "WHERE info_link IS NULL"
+    where = "" if args.all else "WHERE average_rating IS NULL"
     with engine.connect() as conn:
         rows = conn.execute(
-            text(f"SELECT id, title, author FROM public.shelf_books {where} ORDER BY created_at")
+            text(
+                "SELECT id, title, author, info_link "
+                f"FROM public.shelf_books {where} ORDER BY created_at"
+            )
         ).mappings().all()
 
     print(f"{len(rows)} shelf book(s) to look up{' (dry run)' if args.dry_run else ''}")
     updated = no_data = errors = 0
     try:
         for row in rows:
-            try:
-                gb = lookup(row["title"], row["author"] or "", settings.google_books_api_key)
-            except QuotaExhausted as exc:
-                print(
-                    f"\nABORT: Google Books quota exhausted ({exc}).\n"
-                    f"Progress so far is saved. Re-run after the daily quota resets.",
-                    file=sys.stderr,
-                )
-                return 1
-            except TransientError as exc:
-                errors += 1
-                print(f"  [skip: {exc}] {row['title']}")
-                time.sleep(args.sleep)
-                continue
-            if gb is None:
+            hc = hardcover.get_rating(row["title"], row["author"] or "")
+            rating = (hc or {}).get("average_rating")
+            count = (hc or {}).get("ratings_count")
+            link = row["info_link"]
+            source = "hardcover"
+
+            # Google Books: rating fallback, and info_link when missing.
+            if hc is None or link is None:
+                try:
+                    gb = lookup(row["title"], row["author"] or "", settings.google_books_api_key)
+                except QuotaExhausted as exc:
+                    if hc is None:
+                        print(
+                            f"\nABORT: Google Books quota exhausted ({exc}) and no "
+                            f"Hardcover result.\nProgress so far is saved. Re-run later.",
+                            file=sys.stderr,
+                        )
+                        return 1
+                    gb = None
+                except TransientError as exc:
+                    if hc is None:
+                        errors += 1
+                        print(f"  [skip: {exc}] {row['title']}")
+                        time.sleep(args.sleep)
+                        continue
+                    gb = None
+                if gb:
+                    link = link or gb["info_link"]
+                    if hc is None:
+                        rating, count, source = gb["average_rating"], gb["ratings_count"], "google"
+
+            if rating is None and link is None:
                 no_data += 1
-                print(f"  [no match] {row['title']}")
+                print(f"  [no data] {row['title']}")
             else:
-                rating = gb["average_rating"]
                 print(
-                    f"  [{'✓ ' + str(rating) if rating is not None else 'no rating'}] "
+                    f"  [{'✓ ' + str(rating) + ' (' + source + ')' if rating is not None else 'no rating'}] "
                     f"{row['title']}"
                 )
                 if not args.dry_run:
@@ -126,12 +147,7 @@ def main() -> int:
                                 "average_rating = :ar, ratings_count = :rc, info_link = :il "
                                 "WHERE id = :id"
                             ),
-                            {
-                                "ar": rating,
-                                "rc": gb["ratings_count"],
-                                "il": gb["info_link"],
-                                "id": row["id"],
-                            },
+                            {"ar": rating, "rc": count, "il": link, "id": row["id"]},
                         )
                 updated += 1
             time.sleep(args.sleep)
@@ -139,7 +155,7 @@ def main() -> int:
         engine.dispose()
 
     print(
-        f"\nDone: {updated} updated, {no_data} without a Google Books match, "
+        f"\nDone: {updated} updated, {no_data} with no data from either source, "
         f"{errors} skipped on transient errors (re-run to pick those up)."
     )
     return 0

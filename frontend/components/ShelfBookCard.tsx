@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/Modal";
+import { RatingStars } from "@/components/RatingStars";
 import { api, type ShelfBook } from "@/lib/api";
 
 /** A book on a shelf detail page: cover/placeholder with an order badge,
@@ -93,30 +94,10 @@ export function ShelfBookCard({
       {book.author && (
         <p className="line-clamp-1 text-xs text-ink-soft">{book.author}</p>
       )}
-      {(book.average_rating != null || book.info_link) && (
-        <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
-          {book.average_rating != null && (
-            <>
-              <span aria-hidden>★</span>
-              <span>
-                {book.average_rating.toFixed(1)}
-                {book.ratings_count != null &&
-                  ` · ${book.ratings_count.toLocaleString()} ratings`}
-              </span>
-            </>
-          )}
-          {book.info_link && (
-            <a
-              href={book.info_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline"
-              title="Read reviews on Google Books"
-            >
-              reviews ↗
-            </a>
-          )}
-        </p>
+      {book.average_rating != null && (
+        <div className="mt-0.5">
+          <RatingStars rating={book.average_rating} count={book.ratings_count} />
+        </div>
       )}
 
       <div className="mt-1.5 flex items-center gap-1 text-xs">

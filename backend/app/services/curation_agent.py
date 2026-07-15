@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 
 from ..config import get_settings
 from .. import llm_observability
-from . import google_books
+from . import google_books, hardcover
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -124,17 +124,19 @@ def _ground(overview: str, items: list[_ExtractedItem]) -> dict | None:
         if not gb.get("authors"):
             logger.info("curate: dropped author-less result (likely not a book) %r", title)
             continue
+        author_str = ", ".join(gb["authors"]) if gb.get("authors") else (it.author or "")
+        # Ratings: Hardcover first (community coverage beats Google's sparse
+        # ratings), Google Books as fallback from the validation response.
+        hc = hardcover.get_rating(gb["title"] or title, author_str)
         grounded.append(
             {
                 "title": gb["title"] or title,
-                "author": ", ".join(gb["authors"]) if gb.get("authors") else (it.author or ""),
+                "author": author_str,
                 "cover_url": gb.get("cover_url") or None,
                 "reason": (it.reason or "").strip(),
                 "reading_order": 0,
-                # Ratings ride along from the SAME validation response — the
-                # proposal card shows them so the user can judge before accepting.
-                "average_rating": gb.get("average_rating"),
-                "ratings_count": gb.get("ratings_count"),
+                "average_rating": (hc or {}).get("average_rating", gb.get("average_rating")),
+                "ratings_count": (hc or {}).get("ratings_count", gb.get("ratings_count")),
                 "info_link": gb.get("info_link") or None,
             }
         )

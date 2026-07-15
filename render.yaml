@@ -33,6 +33,9 @@ services:
         sync: false
       - key: GOOGLE_BOOKS_API_KEY
         sync: false
+      # Hardcover.app token — book ratings source (unset = ratings disabled)
+      - key: HARDCOVER_API_KEY
+        sync: false
       # The frontend origin(s) allowed by CORS — set to your Vercel URL, e.g.
       # https://trialreads.vercel.app  (comma-separated for multiple).
       - key: CORS_ORIGINS

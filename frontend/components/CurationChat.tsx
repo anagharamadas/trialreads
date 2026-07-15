@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { RatingStars } from "@/components/RatingStars";
 import {
   api,
   type ChatMessage,
@@ -184,30 +185,13 @@ export function CurationChat({
                       {it.author && (
                         <p className="text-xs text-ink-soft">{it.author}</p>
                       )}
-                      {(it.average_rating != null || it.info_link) && (
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-soft">
-                          {it.average_rating != null && (
-                            <>
-                              <span aria-hidden>★</span>
-                              <span>
-                                {it.average_rating.toFixed(1)}
-                                {it.ratings_count != null &&
-                                  ` · ${it.ratings_count.toLocaleString()} ratings`}
-                              </span>
-                            </>
-                          )}
-                          {it.info_link && (
-                            <a
-                              href={it.info_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-accent hover:underline"
-                              title="Read reviews on Google Books"
-                            >
-                              reviews ↗
-                            </a>
-                          )}
-                        </p>
+                      {it.average_rating != null && (
+                        <div className="mt-0.5">
+                          <RatingStars
+                            rating={it.average_rating}
+                            count={it.ratings_count}
+                          />
+                        </div>
                       )}
                       {it.reason && (
                         <p className="mt-0.5 line-clamp-2 text-xs italic text-ink-soft">
