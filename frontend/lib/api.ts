@@ -116,15 +116,18 @@ export const api = {
   deleteBook: (id: number) =>
     request<void>(`/library/${id}`, { method: "DELETE" }),
 
-  // Covers + rating (Google Books via backend, one call)
-  getCover: (title: string, author = "") =>
+  // Covers via backend; pass includeRating only where ratings are shown
+  // (shelf add flow) — it costs a second external lookup server-side.
+  getCover: (title: string, author = "", includeRating = false) =>
     request<{
       cover_url: string | null;
       average_rating: number | null;
       ratings_count: number | null;
       info_link: string | null;
     }>(
-      `/covers?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`
+      `/covers?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}${
+        includeRating ? "&include_rating=1" : ""
+      }`
     ),
 
   // AI

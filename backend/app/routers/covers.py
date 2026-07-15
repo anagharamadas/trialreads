@@ -22,6 +22,12 @@ GOOGLE_BOOKS = "https://www.googleapis.com/books/v1/volumes"
 def get_cover(
     title: str = Query(..., min_length=1),
     author: str = Query(""),
+    include_rating: bool = Query(
+        False,
+        description="Also look up the Hardcover rating (a second external "
+        "call). Only the shelf add-book flow needs it; library cover "
+        "lookups don't display ratings and skip the extra latency.",
+    ),
     user_id: str = Depends(get_current_user_id),
 ) -> dict:
     q = f"intitle:{title}"
@@ -51,7 +57,8 @@ def get_cover(
     except Exception:
         pass
     # Hardcover is the preferred rating source; Google's (if any) is fallback.
-    hc = hardcover.get_rating(title, author)
-    if hc:
-        out.update(hc)
+    if include_rating:
+        hc = hardcover.get_rating(title, author)
+        if hc:
+            out.update(hc)
     return out

@@ -221,7 +221,7 @@ function AddBookModal({
       let ratings_count: number | null = null;
       let info_link: string | null = null;
       try {
-        const gb = await api.getCover(title.trim(), author.trim());
+        const gb = await api.getCover(title.trim(), author.trim(), true);
         cover_url = gb.cover_url;
         average_rating = gb.average_rating;
         ratings_count = gb.ratings_count;

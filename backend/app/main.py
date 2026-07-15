@@ -101,3 +101,27 @@ try:
     app.include_router(_shelves.router)
 except ImportError:
     pass
+
+
+@app.on_event("startup")
+def _warm_db_pool() -> None:
+    """Open one DB connection now so the first real request doesn't pay the
+    Supabase TLS/auth handshake (measured: /library 2.34s on a cold pool vs
+    0.78s warm). Adds ~1.5s to startup — irrelevant next to a Render cold
+    start. pool_pre_ping still guards against stale pooled connections."""
+    import logging
+    import time
+
+    try:
+        from .db import engine
+
+        t0 = time.monotonic()
+        with engine.connect() as conn:
+            conn.exec_driver_sql("SELECT 1")
+        logging.getLogger(__name__).info(
+            "DB pool warmed in %d ms", int((time.monotonic() - t0) * 1000)
+        )
+    except Exception:
+        # Never block startup on a warm-up failure — the health check must
+        # come up even if the DB is briefly unreachable.
+        logging.getLogger(__name__).warning("DB pool warm-up failed", exc_info=True)
