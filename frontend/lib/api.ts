@@ -138,10 +138,10 @@ export const api = {
       "/recommend",
       { method: "POST", body: JSON.stringify({ book_name, author_name }) }
     ),
-  queryLibrary: (query: string) =>
+  queryLibrary: (query: string, history: ChatMessage[] = []) =>
     request<{ answer: string; sql: string | null }>("/library/query", {
       method: "POST",
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, history }),
     }),
 
   // Shelves (Phase 2)

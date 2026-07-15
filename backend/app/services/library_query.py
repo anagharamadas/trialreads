@@ -18,6 +18,8 @@ import json
 import logging
 import os
 
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 from llama_index.core import SQLDatabase
 from llama_index.core.query_engine import NLSQLTableQueryEngine
 from llama_index.llms.openai import OpenAI
@@ -25,11 +27,50 @@ from opentelemetry import trace
 from sqlalchemy import create_engine, event
 from sqlalchemy.pool import NullPool
 
+from .. import llm_observability
 from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 tracer = trace.get_tracer("trialreads.nl_sql")
+
+# Chat memory (see routers/library.py): NLSQLTableQueryEngine answers ONE
+# self-contained question, so follow-ups are handled by condensing the history
+# + latest question into a standalone question first (the classic
+# condense-question pattern). Only the last N turns matter.
+MAX_HISTORY = 10
+
+_CONDENSE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You rewrite the LATEST user question from a conversation about a "
+            "personal book library into ONE fully self-contained question, "
+            "resolving pronouns and references to earlier turns (e.g. 'those "
+            "books', 'that author', 'and in 2024?'). Preserve the user's "
+            "intent exactly; do not answer the question. If it is already "
+            "self-contained, return it unchanged. Return ONLY the rewritten "
+            "question.",
+        ),
+        ("human", "CONVERSATION:\n{transcript}\n\nLATEST QUESTION:\n{question}"),
+    ]
+)
+
+
+def _condense(history: list[dict], question: str, api_key: str, user_id: str) -> str:
+    """Rewrite a follow-up into a standalone question using the chat history."""
+    transcript = "\n".join(
+        f"{m.get('role', 'user')}: {m.get('content', '')}"
+        for m in history[-MAX_HISTORY:]
+        if m.get("content")
+    )
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
+    out = (_CONDENSE_PROMPT | llm).invoke(
+        {"transcript": transcript, "question": question},
+        config=llm_observability.langchain_config("nl-sql", user_id) or None,
+    )
+    rewritten = (out.content or "").strip()
+    return rewritten or question
 
 VIEW = "my_library"
 
@@ -64,8 +105,14 @@ def _scoped_engine(user_id: str):
     return eng
 
 
-def answer_query(user_query: str, user_id: str, api_key: str) -> dict:
-    """Answer a natural-language question over ONLY this user's library."""
+def answer_query(
+    user_query: str, user_id: str, api_key: str, history: list[dict] | None = None
+) -> dict:
+    """Answer a natural-language question over ONLY this user's library.
+
+    `history` (optional, oldest-first [{role, content}]) enables follow-up
+    questions: the latest question is condensed into a standalone one first.
+    """
     # LlamaIndex resolves a default OpenAI embed model at engine init and reads
     # the key from the environment (not actually used for this text-to-SQL path,
     # but required to be present). Mirrors the original library_manager.py.
@@ -77,7 +124,12 @@ def answer_query(user_query: str, user_id: str, api_key: str) -> dict:
     # Exceptions are recorded and flip the span to error status automatically.
     with tracer.start_as_current_span("nl_sql.generate_and_execute") as span:
         span.set_attribute("app.feature", "nl-sql")
+        span.set_attribute("app.nl_sql.history_len", len(history or []))
         try:
+            if history:
+                with tracer.start_as_current_span("nl_sql.condense_question"):
+                    user_query = _condense(history, user_query, api_key, user_id)
+                span.set_attribute("app.nl_sql.condensed_query", user_query)
             sql_database = SQLDatabase(eng, include_tables=[VIEW], view_support=True)
             llm = OpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
             query_engine = NLSQLTableQueryEngine(

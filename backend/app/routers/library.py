@@ -44,7 +44,10 @@ def query_library(
     connection (see services/library_query.py). No other user's data is reachable.
     """
     result = library_query.answer_query(
-        payload.query, user_id, settings.openai_api_key
+        payload.query,
+        user_id,
+        settings.openai_api_key,
+        history=[m.model_dump() for m in payload.history],
     )
     return LibraryQueryResponse(answer=result["answer"], sql=result["sql"])
 

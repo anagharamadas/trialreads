@@ -7,6 +7,13 @@ from pydantic import BaseModel, Field
 Status = Literal["Yet to Buy", "Reading", "Ready to Start", "Finished"]
 
 
+class ChatMessage(BaseModel):
+    """One turn of a conversation (library chat and shelf curation)."""
+
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+
 # ── Library CRUD ──
 class BookCreate(BaseModel):
     book: str = Field(min_length=1)
@@ -62,6 +69,10 @@ class RecommendResponse(BaseModel):
 
 class LibraryQueryRequest(BaseModel):
     query: str = Field(min_length=1)
+    # Prior turns of the chat (oldest first). When present, the backend
+    # condenses follow-ups ("which ones?", "and in 2024?") into a standalone
+    # question before text-to-SQL. Optional — single-shot calls still work.
+    history: list[ChatMessage] = Field(default_factory=list)
 
 
 class LibraryQueryResponse(BaseModel):
@@ -146,11 +157,6 @@ class ShelfBook(BaseModel):
 
 
 # ── Curation agent (Phase 2, M5) ──
-class ChatMessage(BaseModel):
-    role: Literal["user", "assistant", "system"]
-    content: str
-
-
 class CurateRequest(BaseModel):
     messages: list[ChatMessage]
 

@@ -29,7 +29,13 @@ function Chat() {
       if (m) {
         reply = (await api.summarise(m[1])).summary;
       } else {
-        reply = (await api.queryLibrary(text)).answer;
+        // Prior turns give the backend chat memory: follow-ups like "which
+        // ones?" are condensed into standalone questions server-side.
+        const history = messages.map((msg) => ({
+          role: msg.role,
+          content: msg.text,
+        }));
+        reply = (await api.queryLibrary(text, history)).answer;
       }
       setMessages((msgs) => [...msgs, { role: "assistant", text: reply }]);
     } catch (err) {
