@@ -5,9 +5,12 @@ ground every proposed book (no book survives unless Google Books returns it,
 which also supplies the cover image).
 """
 
+import time
+
 import httpx
 
 _GB = "https://www.googleapis.com/books/v1/volumes"
+_RETRIES = 2  # Google Books 503s stochastically; one retry halves the drop rate
 
 
 def _clean_cover(url: str) -> str:
@@ -19,11 +22,17 @@ def search(query: str, max_results: int = 5, api_key: str = "") -> list[dict]:
     params: dict = {"q": query, "maxResults": max_results, "printType": "books"}
     if api_key:
         params["key"] = api_key
-    try:
-        r = httpx.get(_GB, params=params, timeout=15)
-        items = r.json().get("items", []) if r.status_code == 200 else []
-    except Exception:
-        return []
+    items = []
+    for attempt in range(_RETRIES):
+        try:
+            r = httpx.get(_GB, params=params, timeout=15)
+            if r.status_code == 200:
+                items = r.json().get("items", [])
+                break
+        except Exception:
+            pass
+        if attempt + 1 < _RETRIES:
+            time.sleep(0.4)
 
     out = []
     for it in items:
