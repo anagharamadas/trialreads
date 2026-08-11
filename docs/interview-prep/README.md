@@ -39,20 +39,21 @@ Postgres **Row-Level Security** for tenant isolation, per-user rate limiting,
 
 | # | Concept | Interview weight | Status in repo |
 |---|---|---|---|
-| 01 | System architecture & design | High (all levels) | Strong |
-| 02 | Relational databases & data modeling | High | **Strong** ✅ |
-| 03 | REST API design | High | Strong |
-| 04 | Authentication (JWT / JWKS) | Medium–High | Strong |
-| 05 | Authorization & multi-tenant security (RLS) | High | **Strong** ✅ |
-| 06 | Concurrency, async & connection management | Medium–High | Solid |
-| 07 | Rate limiting & resilience | Medium | Solid |
-| 08 | LLM / AI engineering (agent, grounding, memory) | High (AI roles) | Strong |
-| 09 | Observability (OpenTelemetry, logs, Sentry) | Medium–High (senior) | **Strong** ✅ |
-| 10 | CI/CD & deployment (IaC, 12-factor) | Medium | Solid |
-| 11 | Frontend engineering (Next.js, React) | Medium | Solid |
-| — | Current interview patterns & company-specific questions | — | Guide |
+| [01](01-system-architecture-and-design.md) | System architecture & design | High (all levels) | ✅ written |
+| [02](02-databases-and-data-modeling.md) | Relational databases & data modeling | High | ✅ written |
+| [03](03-rest-api-design.md) | REST API design | High | ✅ written |
+| [04](04-authentication-jwt-jwks.md) | Authentication (JWT / JWKS) | Medium–High | ✅ written |
+| [05](05-authorization-and-multitenant-security.md) | Authorization & multi-tenant security (RLS) | High | ✅ written |
+| [06](06-concurrency-async-connections.md) | Concurrency, async & connection management | Medium–High | ✅ written |
+| [07](07-rate-limiting-and-resilience.md) | Rate limiting & resilience | Medium | ✅ written |
+| [08](08-llm-ai-engineering.md) | LLM / AI engineering (agent, grounding, memory) | High (AI roles) | ✅ written |
+| [09](09-observability.md) | Observability (OpenTelemetry, logs, Sentry) | Medium–High (senior) | ✅ written |
+| [10](10-cicd-and-deployment.md) | CI/CD & deployment (IaC, 12-factor) | Medium | ✅ written |
+| [11](11-frontend-engineering.md) | Frontend engineering (Next.js, React) | Medium | ✅ written |
+| [12](12-interview-patterns-and-company-questions.md) | Current interview patterns & company-specific questions | — | ✅ written |
 
-Sections marked ✅ are written; the rest are being authored section by section.
+All 12 sections are complete. Each concept section follows the four-part format above;
+section 12 covers current (2026) company loops and how to steer TrialReads into each round.
 
 ## Levels (so you can calibrate depth)
 
